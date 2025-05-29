@@ -1,42 +1,27 @@
-id: clustering_example_apptainer
-description: Clustering benchmark on Gagolewski's, true number of clusters plus minus 2.
-version: 1.4
-benchmarker: "Izaskun Mallona, Daniel Incicau"
-storage: http://omnibenchmark.org:9000
-benchmark_yaml_spec: 0.04
-storage_api: S3
-storage_bucket_name: clusteringexampleapptainer
-software_backend: apptainer
+# this file has been generated automatically - DO NOT EDIT BY HAND
+version: 1.5
+benchmarker: "Izaskun Mallona, Daniel Incicau, Ben Carrillo"
+benchmark_yaml_spec: 0.4
 software_environments:
   clustbench:
-    description: "clustbench on py3.12.6"
+    description: "clustbench on py3.12.9, optimized python build"
     conda: envs/clustbench.yml
-    envmodule: clustbench
+    envmodule: clustbench/0.1.0-foss-2023b
     apptainer: envs/clustbench.sif
-  sklearn:
-    description: "Daniel's on py3.12.6"
-    conda: envs/sklearn.yml
-    apptainer: envs/sklearn.sif
-    envmodule: clustbench # not true, but
-  R:
-    description: "Daniel's R with readr, dplyr, mclust, caret"
-    conda: envs/r.yml
-    apptainer: envs/r.sif
-    envmodule: fcps # not true, but
-  rmarkdown:
-    description: "R with some plotting dependencies"
-    conda: envs/rmarkdown.yml
-    apptainer: envs/r.sif # not true, but
-    envmodule: fcps # not true, but
   fcps:
     description: "CRAN's FCPS"
     conda: envs/fcps.yml
+    envmodule: fcps/1.3.4-foss-2023a-r-4.3.2
     apptainer: envs/fcps.sif
-    envmodule: fcps
+  rmarkdown:
+    description: "R with some plotting dependencies"
+    conda: envs/rmarkdown.yml
+    envmodule: rmarkdown/0.1.0-gfbf-2024a-r-4.4.2
+    apptainer: envs/fcps.sif
 metric_collectors:
   - id: plotting
     name: "Single-backend metric collector."
-    software_environment: "rmarkdown"
+    software_environment: rmarkdown
     repository:
       url: https://github.com/imallona/clustering_report
       commit: 1d6bdf5
@@ -46,17 +31,15 @@ metric_collectors:
       - id: plotting.html
         path: "{input}/{name}/plotting_report.html"
 stages:
-  ## clustbench data ##########################################################
-
   - id: data
     modules:
       - id: clustbench
         name: "clustbench datasets, from https://www.sciencedirect.com/science/article/pii/S0020025521010082#t0005 Table1"
-        software_environment: "clustbench"
+        software_environment: clustbench
         repository:
           url: https://github.com/imallona/clustbench_data
-          commit: 366c5a2
-        parameters:  # comments depict the possible cardinalities and the number of curated labelsets
+          commit: 31ac323
+        parameters: # comments depict the possible cardinalities and the number of curated labelsets
           - values: ["--dataset_generator", "fcps", "--dataset_name", "atom"] #	2	1
           - values: ["--dataset_generator", "fcps", "--dataset_name", "chainlink"] #	2	1
           - values: ["--dataset_generator", "fcps", "--dataset_name", "engytime"] #	2	2
@@ -124,17 +107,13 @@ stages:
         path: "{input}/{stage}/{module}/{params}/{dataset}.data.gz"
       - id: data.true_labels
         path: "{input}/{stage}/{module}/{params}/{dataset}.labels0.gz"
-
-  ## clustbench methods (fastcluster) ###################################################################
-  
   - id: clustering
     modules:
       - id: fastcluster
         name: "fastcluster algorithm"
-        software_environment: "clustbench"
+        software_environment: clustbench
         repository:
           url: https://github.com/imallona/clustbench_fastcluster
-          # url: /home/imallona/src/clustbench_fastcluster/
           commit: "45e43d3"
         parameters:
           - values: ["--linkage", "complete"]
@@ -144,11 +123,10 @@ stages:
           - values: ["--linkage", "median"]
           - values: ["--linkage", "centroid"]
       - id: sklearn
-        name: "sklearn"
-        software_environment: "clustbench"
+        name: sklearn
+        software_environment: clustbench
         repository:
           url: https://github.com/imallona/clustbench_sklearn
-          #url: /home/imallona/src/clustbench_sklearn
           commit: 5877378
         parameters:
           - values: ["--method", "birch"]
@@ -166,8 +144,8 @@ stages:
           - values: ["--linkage", "complete"]
           - values: ["--linkage", "ward"]
       - id: genieclust
-        name: "genieclust"
-        software_environment: "clustbench"
+        name: genieclust
+        software_environment: clustbench
         repository:
           url: https://github.com/imallona/clustbench_genieclust
           commit: 6090043
@@ -201,12 +179,11 @@ stages:
     outputs:
       - id: clustering.predicted_ks_range
         path: "{input}/{stage}/{module}/{params}/{dataset}_ks_range.labels.gz"
-
   - id: metrics
     modules:
       - id: partition_metrics
         name: "clustbench partition metrics"
-        software_environment: "clustbench"
+        software_environment: clustbench
         repository:
           url: https://github.com/imallona/clustbench_metrics
           commit: 9132d45
@@ -229,89 +206,6 @@ stages:
     outputs:
       - id: metrics.scores
         path: "{input}/{stage}/{module}/{params}/{dataset}.scores.gz"
-
-  # ## daniel's data ###########################################################################
-  
-  # - id: danielsdata
-  #   modules:
-  #     - id: iris_manual
-  #       name: "Iris Dataset"
-  #       software_environment: "sklearn"
-  #       repository:
-  #         url: https://github.com/omnibenchmark-example/iris.git
-  #         commit: 47c63f0
-  #     - id: penguins
-  #       name: "Penguins Dataset"
-  #       software_environment: "sklearn"
-  #       repository:
-  #         url: https://github.com/omnibenchmark-example/penguins.git
-  #         commit: 9032478
-  #   outputs:
-  #     - id: data.features
-  #       path: "{input}/{stage}/{module}/{params}/{dataset}.features.csv"
-  #     - id: data.labels
-  #       path: "{input}/{stage}/{module}/{params}/{dataset}.labels.csv"
-  
-  # ## daniel's distances ########################################################################
-  
-  # - id: distances
-  #   modules:
-  #     - id: D1
-  #       software_environment: "sklearn"
-  #       parameters:
-  #         - values: ["--measure", "cosine"]
-  #         - values: ["--measure", "euclidean"]
-  #         - values: ["--measure", "manhattan"]
-  #         - values: ["--measure", "chebyshev"]
-  #       repository:
-  #         url: https://github.com/omnibenchmark-example/distance.git
-  #         commit: dd99d4f
-  #   inputs:
-  #     - entries:
-  #         - data.features
-  #   outputs:
-  #     - id: distances
-  #       path: "{input}/{stage}/{module}/{params}/{dataset}.distances.csv"
-        
-  # ## daniel's methods ###################################################################
-  
-  # - id: danielmethods
-  #   modules:
-  #     - id: kmeans
-  #       software_environment: "sklearn"
-  #       repository:
-  #         url: https://github.com/omnibenchmark-example/kmeans.git
-  #         commit: 049c8b1
-  #     - id: ward
-  #       software_environment: "R"
-  #       repository:
-  #         url: https://github.com/omnibenchmark-example/ward.git
-  #         commit: 976e3f3
-  #   inputs:
-  #     - entries:
-  #         - distances
-  #   outputs:
-  #     - id: methods.clusters
-  #       path: "{input}/{stage}/{module}/{params}/{dataset}.clusters.csv"
-
-  # ## daniel's metrics ###################################################################
-
-  # - id: danielsmetrics
-  #   modules:
-  #     - id: ari
-  #       software_environment: "R"
-  #       repository:
-  #         url: https://github.com/omnibenchmark-example/ari.git
-  #         commit: 72708f0
-  #     - id: accuracy
-  #       software_environment: "R"
-  #       repository:
-  #         url: https://github.com/omnibenchmark-example/accuracy.git
-  #         commit: e26b32f
-  #   inputs:
-  #     - entries:
-  #         - methods.clusters
-  #         - data.labels
-  #   outputs:
-  #     - id: metrics.mapping
-  #       path: "{input}/{stage}/{module}/{params}/{dataset}.metrics.txt"
+id: clustering_benchmark_apptainer_vanilla_local
+description: Clustering benchmark on Gagolewski's. Using apptainer (locally built image)
+software_backend: apptainer

@@ -1,0 +1,12 @@
+# this file has been generated automatically - DO NOT EDIT BY HAND
+id: clustering_benchmark_apptainer_optimized_local
+description: Clustering benchmark on Gagolewski's. Using apptainer (locally built image, optimized python)
+software_backend: apptainer
+
+software_environments:
+  clustbench:
+    apptainer: envs/clustbench-optimized.sif
+  fcps:
+    apptainer: envs/fcps.sif
+  rmarkdown:
+    apptainer: envs/fcps.sif

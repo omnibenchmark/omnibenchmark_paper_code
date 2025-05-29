@@ -7,6 +7,8 @@ dependencies:
   - conda-forge::python=3.12.6
   - conda-forge::r-argparse
   - conda-forge::r-rmarkdown
+  - conda-forge::r-cairo
+  - conda-forge::r-svglite
   - conda-forge::r-ggplot2
-  - conda-forge::r-tidyr  
+  - conda-forge::r-tidyr
   - bioconda::bioconductor-complexheatmap

@@ -206,6 +206,6 @@ stages:
     outputs:
       - id: metrics.scores
         path: "{input}/{stage}/{module}/{params}/{dataset}.scores.gz"
-id: clustering_benchmark_conda
-description: Clustering benchmark on Gagolewski's. Using conda.
-software_backend: conda
+id: clustering_benchmark_apptainer_oras
+description: Clustering benchmark on Gagolewski's. Using apptainer from omnibenchmark ORAS registry.
+software_backend: apptainer

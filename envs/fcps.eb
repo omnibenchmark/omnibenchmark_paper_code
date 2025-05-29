@@ -1,6 +1,3 @@
-## largely as in https://github.com/easybuilders/easybuild-easyconfigs/commit/e9a36171c68414f933ab1afa03b32422491f0f96#diff-3f2a92ab6ab59ddaccf4bc61b59bdd3f6717b95fd019131a57f51eefc831a699
-## Caution boost easyconfig needs update  https://raw.githubusercontent.com/easybuilders/easybuild-easyconfigs/refs/heads/develop/easybuild/easyconfigs/b/Boost/Boost-1.82.0-GCC-12.3.0.eb (https://github.com/easybuilders/easybuild-easyconfigs/commit/e29210626f076e3a207f1abf3759ea124e28f8b2)
-
 easyblock = 'Bundle'
 
 name = 'fcps'
@@ -16,17 +13,13 @@ builddependencies = [('pkgconf', '1.9.5')]
 
 dependencies = [
     ('R', '4.3.2'),
-    ('Boost', '1.82.0'), 
+    ('Boost', '1.82.0'),
     ('GSL', '2.7'),
-#    ('arrow-R', '14.0.1', versionsuffix),  # required by RcisTarget
 ]
 
 exts_default_options = {
     'source_urls': [
-        'https://bioconductor.org/packages/3.18/bioc/src/contrib/',
-        'https://bioconductor.org/packages/3.18/bioc/src/contrib/Archive/%(name)s',
-        'https://bioconductor.org/packages/3.18/data/annotation/src/contrib/',
-        'https://bioconductor.org/packages/3.18/data/experiment/src/contrib/',
+       'https://bioconductor.org/packages/release/bioc/src/contrib/',
         'https://cran.r-project.org/src/contrib/Archive/%(name)s',  # package archive
         'https://cran.r-project.org/src/contrib/',  # current version of packages
         'https://cran.freestatistics.org/src/contrib',  # mirror alternative for current packages
@@ -192,13 +185,15 @@ exts_list = [
     ('cluster', '2.1.8', {
         'checksums': ['c32a462e34694c99d58da953efa74882b5427f8c5db7cb226ae15c54ce6060ca'],
     }),
-    ('graph', '1.84.1', {
-        'checksums': ['cd2a91c93c81c09d9c59853c417e8a9cdde39b0589bacdce4ca916b6ee5f45a7'],
+    ('graph', '1.86.0', {
+        'checksums': ['ac9e196dfcb43848a851ea2d339cff41f8f16c7e80e76282c8fe7b822df8f367'],
     }),
     ('mclust', '6.1.1', {
         'checksums': ['ddd7018e5e6ea7f92c7fc9872b391491b7e91c2cd89ef1dcaf4408afb5116775'],
     }),
-    ('cclust', '0.6-26'),
+    ('cclust', '0.6-26', {
+        'checksums': ['92ec3c55a1864e4e1a4706bfdef8ad00727c720213ac656c718e867286b29857'],
+    }),
     ('flowClust', '3.40.0', {
         'installopts': "--configure-args='--with-gsl=${EBROOTGSL} --enable-bundled-gsl=false'",
         'checksums': ['7e699b06e378e32144704dbec18289109980b0f5eca166180f2c30007b83e0f5'],

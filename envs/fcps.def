@@ -1,0 +1,39 @@
+Bootstrap: docker
+From: rocker/tidyverse:4.4
+
+%labels
+
+    AUTHOR izaskun.mallona@gmail.com
+    AUTHOR ben.uzh@proton.me
+
+%post
+
+    # Install python (3.12 as of noble)
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y git \
+        python-is-python3 \
+        python3.12 \
+        python3.12-venv \
+        && apt-get clean && \
+        rm -rf /var/lib/apt/lists/*
+
+    # virtualenv
+    cd /opt
+    python3.12 -m venv "default"
+    . default/bin/activate
+
+    pip install \
+        "gitpython==3.1.43" \
+        "isodate==0.7.2" \
+        "pydantic-core==2.34.1"
+
+    # Install R packages
+    ## FIXME no versioning here
+    Rscript -e 'BiocManager::install(c( "dbscan", "cluster", "protoclust", "energy", "argparse", "mclust", "caret", "DataVisualizations", "FCPS", "cclust"))'
+
+    echo '. /opt/default/bin/activate' >> $SINGULARITY_ENVIRONMENT
+
+%environment
+
+    . /opt/default/bin/activate

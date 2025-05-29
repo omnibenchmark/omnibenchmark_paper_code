@@ -1,0 +1,197 @@
+easyblock = 'Bundle'
+
+# TODO(ben): Try to use https://www.eessi.io/docs/available_software/detail/R-bundle-CRAN/
+# and build only what's left out.
+
+name = 'rmarkdown'
+version = '0.1.0'
+versionsuffix = '-r-%(rver)s'
+
+homepage = 'https://omnibenchmark.org'
+description = 'rmarkdown bundle for clustbench reports'
+
+toolchain = {'name': 'gfbf', 'version': '2024a'}
+
+dependencies = [
+    ('R', '4.4.2'),
+]
+
+exts_default_options = {
+    'source_urls': [
+        'https://cloud.r-project.org/src/contrib/',
+        'https://cran.r-project.org/src/contrib/',  				# current version of packages
+        'https://cran.r-project.org/src/contrib/Archive/%(name)s',  		# package archive
+        'https://www.bioconductor.org/packages/release/bioc/src/contrib/',      # bioconductor
+    ],
+    'sources': ['%(name)s_%(version)s.tar.gz'],
+}
+
+exts_defaultclass = 'RPackage'
+
+exts_list = [
+    ('rlang', '1.1.6', {
+        'checksums': ['18544c876f4e18ec554edecc308362a52fbc7e0805c4794cf59bcc4d0b57f330'],
+    }),
+    ('glue', '1.8.0', {
+        'checksums': ['c86f364ba899b8662f5da3e1a75f43ae081ab04e0d51171d052356e7ee4b72a0'],
+    }),
+    ('cli', '3.6.4', {
+        'checksums': ['0c39539ce173bcbf7abaca64e8d2c87ffec8257c144c31b793c4cf2dd9cf7620'],
+    }),
+    ('lifecycle', '1.0.4', {
+        'checksums': ['ada4d3c7e84b0c93105e888647c5754219a8334f6e1f82d5afaf83d4855b91cc'],
+    }),
+    ('vctrs', '0.6.5', {
+        'checksums': ['43167d2248fd699594044b5c8f1dbb7ed163f2d64761e08ba805b04e7ec8e402'],
+    }),
+    ('utf8', '1.2.4', {
+        'checksums': ['418f824bbd9cd868d2d8a0d4345545c62151d321224cdffca8b1ffd98a167b7d'],
+    }),
+    ('lattice', '0.22-5', {
+        'checksums': ['ba1fbe5e18a133507dca9851b7f933002bdb6d1f3ea5f410a0a441103b6da5f1'],
+    }),
+    ('pkgconfig', '2.0.3', {
+        'checksums': ['330fef440ffeb842a7dcfffc8303743f1feae83e8d6131078b5a44ff11bc3850'],
+    }),
+    ('pillar', '1.10.2', {
+        'checksums': ['2cdbe3fe1b28b62530880ab26fc3c874e0dd5060767ae1a8ee5685f65e56d645'],
+    }),
+    ('magrittr', '2.0.3', {
+        'checksums': ['a2bff83f792a1acb801bfe6330bb62724c74d5308832f2cb6a6178336ace55d2'],
+    }),
+    ('fansi', '1.0.6', {
+        'checksums': ['ea9dc690dfe50a7fad7c5eb863c157d70385512173574c56f4253b6dfe431863'],
+    }),
+    ('viridisLite', '0.4.2', {
+        'checksums': ['893f111d31deccd2cc959bc9db7ba2ce9020a2dd1b9c1c009587e449c4cce1a1'],
+    }),
+    ('RColorBrewer', '1.1-3', {
+        'checksums': ['4f42f5423c45688b39f492c7892d93f37b4541831c8ffb140364d2bd89031ac0'],
+    }),
+    ('R6', '2.6.1', {
+        'checksums': ['59c6eba8b1b912eb7e104f65053235604be853425ee67c152ac4e86a1f2073b4'],
+    }),
+    ('labeling', '0.4.3', {
+        'checksums': ['c62f4fc2cc74377d7055903c5f1913b7295f7587456fe468592738a483e264f2'],
+    }),
+    ('farver', '2.1.2', {
+        'checksums': ['528823b95daab4566137711f1c842027a952bea1b2ae6ff098e2ca512b17fe25'],
+    }),
+    ('Matrix', '1.7-3', {
+        'checksums': ['6642e9db8cddf32a051972fd5a634bf7edbdc925c5c2d139bf71e92df00fb44e'],
+    }),
+    ('nlme', '3.1-168', {
+        'checksums': ['23b78468344cb6775dee5e0d9c8133032d64f08ebaba20776508a0443a897362'],
+    }),
+    ('withr', '3.0.2', {
+        'checksums': ['0a3a05f493d275cca4bf13c8c1b95a1a4eed7f83b2493f41fde02ce3fc92c1a3'],
+    }),
+    ('tibble', '3.2.1', {
+        'checksums': ['65a72d0c557fd6e7c510d150c935ed6ced5db7d05fc20236b370f11428372131'],
+    }),
+    ('colorspace', '2.1-1', {
+        'checksums': ['e721cee5f4d6e4b0fc8eb18265e316b4f856fd3be02f0775a26032663758cd0b'],
+    }),
+    ('munsell', '0.5.1', {
+        'checksums': ['03a2fd9ac40766cded96dfe33b143d872d0aaa262a25482ce19161ca959429a6'],
+    }),
+    ('scales', '1.3.0', {
+        'checksums': ['b33e0f6b44259551ce02befd52eac53602509fbfdd903920620c658c50f35888'],
+    }),
+    ('mgcv', '1.9-1', {
+        'checksums': ['700fbc37bedd3a49505b9bc4949faee156d9cfb4f669d797d06a10a15a5bdb32'],
+    }),
+    ('MASS', '7.3-65', {
+        'checksums': ['b07ef1e3c364ce56269b4a8a7759cc9f87c876554f91293437bb578cfe38172f'],
+    }),
+    ('isoband', '0.2.7', {
+        'checksums': ['7693223343b45b86de2b5b638ff148f0dafa6d7b1237e822c5272902f79cdf61'],
+    }),
+    ('gtable', '0.3.6', {
+        'checksums': ['d305a5fa11278b649d2d8edc5288bf28009be888a42be58ff8714018e49de0ef'],
+    }),
+    ('ggplot2', '3.5.2', {
+        'checksums': ['0a30024a2ff3e569412223c8f14563ed504f3e0851de03e42d1b5f73fe1f06bf'],
+    }),
+    ('findpython', '1.0.9', {
+        'checksums': ['b6a15e0cdfcdd4b1cfc76f7e4eaad0125d4d52889711200075280e9b2a2cb7cb'],
+    }),
+    ('argparse', '2.2.5', {
+        'checksums': ['53c8a9eb51041084eb3d9c271b14ebcb32dc2f50cf16afa5c54c504a97229ea4'],
+    }),
+    (name, '2.29', {
+        'checksums': ['6662ac85316c869caad6e3b95468cad97f6eef106d47b066db8d40c05a490928'],
+    }),
+    ('generics', '0.1.3', {
+        'checksums': ['75046163bfa8b8a4f4214c1b689e796207f6447182f2e5062cf570302387d053'],
+    }),
+    ('tidyselect', '1.2.1', {
+        'checksums': ['169e97ba0bbfbcdf4a80534322751f87a04370310c40e27f04aac6525d45903c'],
+    }),
+    ('dplyr', '1.1.4', {
+        'checksums': ['cf730414d5d4ab387b4e9890a4b1df9d17a3903488e8da8df1cf2e11e44558cb'],
+    }),
+    ('tidyr', '1.3.1', {
+        'checksums': ['e820c261cb5543f572f49276a7bdc7302aa4215da4bf850b1b939a315353835d'],
+    }),
+    ('shape', '1.4.6.1', {
+        'checksums': ['43f9bd0f997fd6cf1838efd8b2509c9a6396513f4e54a20360481634affd22a4'],
+    }),
+    ('GlobalOptions', '0.1.2', {
+        'checksums': ['47890699668cfa9900a829c51f8a32e02a7a7764ad07cfac972aad66f839753e'],
+    }),
+    ('circlize', '0.4.16', {
+        'checksums': ['16dc32c7704906d13a9e5281bb396e92fb89a6b17fa5e201953240726b650b67'],
+    }),
+    ('rjson', '0.2.23', {
+        'checksums': ['55034575c854ed657e6701da278c0fdea251479624d06a963b2e58461a5f0f48'],
+    }),
+    ('GetoptLong', '1.0.5', {
+        'checksums': ['8c237986ed3dfb72d956ad865ef7768644eebf144675ad66140acfd1aca9d701'],
+    }),
+    ('cluster', '2.1.8.1', {
+        'checksums': ['4b95b78e09b17ddca72edc0bb180c753c004ed2f61c3eb12e0451ac77f441e57'],
+    }),
+    ('clue', '0.3-66', {
+        'checksums': ['aa86dd58c05635eb394c9ede0dd15a4f24af4815f299451bbc7895c0f737c2fb'],
+    }),
+    ('png', '0.1-8', {
+        'checksums': ['5a36fabb6d62ba2533d3fc4cececd07891942cfb76fe689ec0d550d08762f61c'],
+    }),
+    ('BiocGenerics', '0.54.0', {
+        'checksums': ['413d6f74cbc671147f63eefc46b718af815d6497535c2198925d9306e00c41b9'],
+    }),
+    ('S4Vectors', '0.46.0', {
+        'checksums': ['c34249c6a367a2a1e94158d9e60294f2b901e485d93717250a417569be187a40'],
+    }),
+    ('IRanges', '2.42.0', {
+        'checksums': ['0abb01ee93111c5fc678f9aa2f93d00d8d1548263cb60daa52645a6061b603fc'],
+    }),
+    ('matrixStats', '1.5.0', {
+        'checksums': ['12996c5f3e6fc202a43e1087f16a71b7fa93d7e908f512542c7ee89cf95dcc15'],
+    }),
+    ('iterators', '1.0.14', {
+        'checksums': ['cef3075a0930e1408c764e4da56bbadd4f7d14315809df8f38dd51f80ccc677b'],
+    }),
+    ('codetools', '0.2-20', {
+        'checksums': ['3be6f375ec178723ddfd559d1e8e85bfeee04a5fbaf9f53f2f844e1669fea863'],
+    }),
+    ('foreach', '1.5.2', {
+        'checksums': ['56338d8753f9f68f262cf532fd8a6d0fe25a71a2ff0107f3ce378feb926bafe4'],
+    }),
+    ('doParallel', '1.0.17', {
+        'checksums': ['b96a25ad105a654d70c7b4ca27290dc9967bc47f4668b2763927a886b178abd7'],
+    }),
+    ('ComplexHeatmap', '2.24.0', {
+        'checksums': ['2a015ad26c5a5f003ee203d77cc8d3eea5461bcf2db7ce102da1bef7db082650'],
+    }),
+]
+
+modextrapaths = {'R_LIBS_SITE': ''}
+
+sanity_check_paths = {
+    'files': [],
+    'dirs': ['argparse', 'rmarkdown', 'ggplot2', 'tidyr', 'ComplexHeatmap'],
+}
+
+moduleclass = 'bio'

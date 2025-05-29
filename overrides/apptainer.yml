@@ -1,0 +1,4 @@
+# this file has been generated automatically - DO NOT EDIT BY HAND
+id: clustering_benchmark_apptainer_oras
+description: Clustering benchmark on Gagolewski's. Using apptainer from omnibenchmark ORAS registry.
+software_backend: apptainer

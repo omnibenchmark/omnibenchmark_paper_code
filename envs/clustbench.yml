@@ -6,9 +6,7 @@ dependencies:
   - conda-forge::python=3.12.6
   - conda-forge::pip
   - pip:
-    #- "clustering-benchmarks==1.1.5"
-    - 'https://github.com/gagolews/clustering-benchmarks/releases/download/v1.1.5/clustering_benchmarks-1.1.5.tar.gz'
-    - "wget"
+    - "clustering-benchmarks==1.1.6"
     - "fastcluster==1.2.6"
     - "numpy==1.26.4"
     - "scipy==1.14.1"

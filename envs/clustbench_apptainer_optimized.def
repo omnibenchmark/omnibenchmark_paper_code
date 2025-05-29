@@ -1,0 +1,100 @@
+Bootstrap: docker
+From: ubuntu:noble-20250404
+
+%labels
+    Author izaskun.mallona@gmail.com
+    Author ben.uzh@proton.me
+
+%post
+    PYTHON_VERSION=3.12.9
+    PYTHON_MAJOR_VERSION=$(echo $PYTHON_VERSION | cut -d. -f1,2)
+
+    # Update and enable deb-src
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    echo "deb-src http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse" >> /etc/apt/sources.list
+    echo "deb-src http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse" >> /etc/apt/sources.list
+    apt-get update
+
+    # Get build dependencies for Python
+    apt-get build-dep -y python3
+
+    # Extra dependencies
+    apt-get install -y git \
+        python-is-python3 \
+        wget \
+        zlib1g-dev \
+        libbz2-dev \
+        libssl-dev \
+        libffi-dev \
+        && apt-get clean && \
+        rm -rf /var/lib/apt/lists/*
+
+    # Calculate half the number of available cores
+    HALF_NPROC=$(( $(nproc) / 2 ))
+    # Ensure at least one core is used
+    CORES_TO_USE=$(( HALF_NPROC > 0 ? HALF_NPROC : 1 ))
+
+    # Download and build Python from source, with optimizations
+
+    mkdir ~/src && cd ~/src
+    wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz
+    tar -xf Python-${PYTHON_VERSION}.tgz
+    cd Python-${PYTHON_VERSION}*/
+
+    # Enable all possible optimizations
+    ./configure \
+        --enable-optimizations \
+        --with-lto \
+        --enable-shared \
+        LDFLAGS="-Wl,-rpath /usr/local/lib"
+    make -j ${CORES_TO_USE}
+    make altinstall
+
+    # Create virtualenv using the locally built Python
+    cd /opt
+    /usr/local/bin/python${PYTHON_MAJOR_VERSION} -m venv "default"
+    . default/bin/activate
+
+    # Install required packages with pip
+
+    pip install -U pip wheel
+
+    pip install \
+      "clustering-benchmarks==1.1.6" \
+      "contourpy==1.3.2" \
+      "cycler==0.12.1" \
+      "cython==3.1.0" \
+      "fonttools==4.58.0" \
+      "genieclust==1.1.6" \
+      "joblib==1.5.0" \
+      "kiwisolver==1.4.8" \
+      "matplotlib==3.10.3" \
+      "natsort==8.4.0" \
+      "numpy==2.2.5" \
+      "packaging==25.0" \
+      "pandas==2.2.3" \
+      "pillow==11.2.1" \
+      "pyparsing==3.2.3" \
+      "python-dateutil==2.9.0.post0" \
+      "pytz==2025.2" \
+      "scikit-learn==1.6.1" \
+      "scipy==1.15.3" \
+      "six==1.17.0" \
+      "threadpoolctl==3.6.0" \
+      "tzdata==2025.2" \
+      "fastcluster==1.3.0" \
+      "gitpython==3.1.43" \
+      "isodate==0.7.2" \
+      "pydantic-core==2.34.1"
+
+    # Do some cleanup to keep the image slim
+    rm -rf ~/.cache
+    rm -rf ~/src
+
+    echo '. /opt/default/bin/activate' >> $SINGULARITY_ENVIRONMENT
+
+%environment
+
+    . /opt/default/bin/activate
+

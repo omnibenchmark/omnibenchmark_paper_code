@@ -1,0 +1,28 @@
+easyblock = 'Bundle'
+
+# This is a dummy bundle that installs:
+# 1. rmarkdown: an R bundle that we also package
+# 2. Python-3.12.3-GCCcore-13.3.0
+# This is a dependency for the clustering_benchmark metric collector.
+
+name = 'rmarkdown-python'
+version = '0.1.0'
+
+local_rver = '4.4.2'
+local_pyver = '3.12.3'
+versionsuffix = f'-r-{local_rver}-py-{local_pyver}'
+
+homepage = 'https://omnibenchmark.org'
+description = 'Rmarkdown bundle with specific Python dependency'
+
+toolchain = {'name': 'system', 'version': '1.0'}
+
+dependencies = [
+    ('rmarkdown', '0.1.0', f'-gfbf-2024a-r-{local_rver}'),
+    ('Python', local_pyver, '-GCCcore-13.3.0'),
+]
+
+sanity_check_paths = {
+    'files': [],
+    'dirs': ['../../rmarkdown/0.1.0-gfbf-2024a-r-4.4.2']
+}

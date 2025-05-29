@@ -1,0 +1,4 @@
+# this file has been generated automatically - DO NOT EDIT BY HAND
+id: clustering_benchmark_conda
+description: Clustering benchmark on Gagolewski's. Using conda.
+software_backend: conda
