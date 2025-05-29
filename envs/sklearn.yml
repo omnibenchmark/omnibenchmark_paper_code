@@ -1,0 +1,11 @@
+name: sklearn
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - conda-forge::python=3.12.6
+  - conda-forge::scikit-learn
+  - conda-forge::pip
+  - pip:
+    - "pandas"
+    - "argparse"

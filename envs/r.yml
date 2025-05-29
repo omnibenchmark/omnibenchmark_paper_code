@@ -1,0 +1,12 @@
+name: r_for_metrics
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - conda-forge::python=3.12.6
+  - conda-forge::r-mclust
+  - conda-forge::r-caret
+  - conda-forge::r-dplyr
+  - conda-forge::r-readr
+  - conda-forge::r-argparse
+  

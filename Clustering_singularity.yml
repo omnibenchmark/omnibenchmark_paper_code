@@ -1,12 +1,12 @@
-id: clustering_example_envmodules
+id: clustering_example_apptainer
 description: Clustering benchmark on Gagolewski's, true number of clusters plus minus 2.
 version: 1.4
 benchmarker: "Izaskun Mallona, Daniel Incicau"
 storage: http://omnibenchmark.org:9000
 benchmark_yaml_spec: 0.04
 storage_api: S3
-storage_bucket_name: clusteringexampleenvmodules
-software_backend: envmodules
+storage_bucket_name: clusteringexampleapptainer
+software_backend: apptainer
 software_environments:
   clustbench:
     description: "clustbench on py3.12.6"
