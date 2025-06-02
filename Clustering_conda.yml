@@ -24,7 +24,7 @@ metric_collectors:
     software_environment: "fcps"
     repository:
       url: https://github.com/imallona/clustering_report
-      commit: df50d47 #75d799b # 1d6bdf5
+      commit: ccdaf84
     inputs:
       - metrics.scores
     outputs:
@@ -165,7 +165,7 @@ stages:
         software_environment: "fcps"
         repository:
           url: https://github.com/imallona/clustbench_fcps
-          commit: 272fa5f
+          commit: 8a47a0d
         parameters:
           # - values: ["--method", "FCPS_AdaptiveDensityPeak"] # not in conda
           - values: ["--method", "FCPS_Minimax"]
