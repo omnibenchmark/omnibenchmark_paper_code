@@ -123,11 +123,11 @@ stages:
           commit: "45e43d3"
         parameters:
           - values: ["--linkage", "complete"]
-          - values: ["--linkage", "ward"]
-          - values: ["--linkage", "average"]
-          - values: ["--linkage", "weighted"]
-          - values: ["--linkage", "median"]
-          - values: ["--linkage", "centroid"]
+          # - values: ["--linkage", "ward"]
+          # - values: ["--linkage", "average"]
+          # - values: ["--linkage", "weighted"]
+          # - values: ["--linkage", "median"]
+          # - values: ["--linkage", "centroid"]
       - id: sklearn
         name: "sklearn"
         software_environment: "clustbench"
@@ -137,9 +137,9 @@ stages:
           commit: 5877378
         parameters:
           - values: ["--method", "birch"]
-          - values: ["--method", "kmeans"]
+          # - values: ["--method", "kmeans"]
           # - values: ["--method", "spectral"] ## too slow
-          - values: ["--method", "gm"]
+          # - values: ["--method", "gm"]
       - id: agglomerative
         name: "agglomerative"
         software_environment: "clustbench"
@@ -148,8 +148,8 @@ stages:
           commit: 5454368
         parameters:
           - values: ["--linkage", "average"]
-          - values: ["--linkage", "complete"]
-          - values: ["--linkage", "ward"]
+          # - values: ["--linkage", "complete"]
+          # - values: ["--linkage", "ward"]
       - id: genieclust
         name: "genieclust"
         software_environment: "clustbench"
@@ -158,8 +158,8 @@ stages:
           commit: 6090043
         parameters:
           - values: ["--method", "genie", "--gini_threshold", 0.5]
-          - values: ["--method", "gic"]
-          - values: ["--method", "ica"]
+          - # values: ["--method", "gic"]
+          # - values: ["--method", "ica"]
       - id: fcps
         name: "fcps"
         software_environment: "fcps"
@@ -202,11 +202,11 @@ stages:
           - values: ["--metric", "adjusted_rand_score"]
           - values: ["--metric", "fm_score"]
           - values: ["--metric", "mi_score"]
-          - values: ["--metric", "normalized_clustering_accuracy"]
-          - values: ["--metric", "normalized_mi_score"]
-          - values: ["--metric", "normalized_pivoted_accuracy"]
-          - values: ["--metric", "pair_sets_index"]
-          - values: ["--metric", "rand_score"]
+          # - values: ["--metric", "normalized_clustering_accuracy"]
+          # - values: ["--metric", "normalized_mi_score"]
+          # - values: ["--metric", "normalized_pivoted_accuracy"]
+          # - values: ["--metric", "pair_sets_index"]
+          # - values: ["--metric", "rand_score"]
     inputs:
       - entries:
           - clustering.predicted_ks_range
