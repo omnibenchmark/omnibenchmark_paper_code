@@ -21,3 +21,5 @@ dependencies:
   - conda-forge::r-ggplot2
   - conda-forge::r-tidyr
   - bioconda::bioconductor-complexheatmap
+  - conda-forge::r-jsonlite
+  - conda-forge::r-dplyr
