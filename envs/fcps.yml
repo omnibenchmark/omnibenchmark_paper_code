@@ -15,3 +15,9 @@ dependencies:
   - conda-forge::r-cluster==2.1.8
   - conda-forge::r-mclust==6.1.1
   - r::r-cclust=0.6_26
+  - conda-forge::r-rmarkdown
+  - conda-forge::r-cairo
+  - conda-forge::r-svglite
+  - conda-forge::r-ggplot2
+  - conda-forge::r-tidyr
+  - bioconda::bioconductor-complexheatmap

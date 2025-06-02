@@ -70,7 +70,7 @@ jobs:
         shell: bash -l {0}
         run: |
           env
-          output=$( echo "y" | ob run benchmark -b Clustering.yaml --local --cores 10  2>&1 )
+          output=$( echo "y" | ob run benchmark -b Clustering_conda.yaml --local --cores 10  2>&1 )
           status=$?
           if echo "$output" | grep -i 'Benchmark run has finished successfully'; then
              status=0

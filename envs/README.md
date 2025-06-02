@@ -1,8 +1,7 @@
 We distribute `Clustering.yml` runs with different backends.
 
 - `Clustering_conda.yml`. Conda semi-reproducible (no pinning, pip)
-- `Clustering_singularity.yml`. Singularity semi-reproducible, local SIF files.
-- `Clustering_oras.yml`. Singularity semi-reproducible, prebuilt remote images.
+- `Clustering_oras.yml`. Singularity non- to semi-reproducible, prebuilt remote images.
 - `Clustering_envmodules.yml`. Easybuilt with default optimization.
 
 
@@ -12,8 +11,6 @@ We distribute `Clustering.yml` runs with different backends.
 
 - `clustbench.yml`
 - `fcps.yml`
-- `r.yml`
-- `sklearn.yml`
 
 ### How to build
 
@@ -25,12 +22,16 @@ No need to `ob software conda pin / prepare`; let `ob run benchmark -b Clusterin
 
 - `clustbench_singularity.def`
 - `fcps_singularity.def`
-- `r_singularity.def`
-- `sklearn_singularity.def`
 
 ### How to build
 
 - `build_singularity.sh`
+
+### How to push to renku's gitlab registry
+
+```
+apptainer push --docker-username janedoe --docker-password glpat-uzh fcps.sif oras://registry.renkulab.io/izaskun.mallona/clustering_example/name:tag
+```
 
 ## Aptainer semi-reproducible and remote
 
@@ -48,6 +49,7 @@ Lorem ipsum.
 
 - `clustbench.eb`
 - `fcps.eb`
+- `rmarkdown.eb`
 
 ### How to build
 
