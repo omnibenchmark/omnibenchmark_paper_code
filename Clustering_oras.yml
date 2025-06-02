@@ -5,8 +5,8 @@ benchmarker: "Izaskun Mallona, Daniel Incicau, Ben Carrillo"
 storage: http://omnibenchmark.org:9000
 benchmark_yaml_spec: 0.04
 storage_api: S3
-storage_bucket_name: clusteringexampleconda
-software_backend: conda
+storage_bucket_name: clusteringexampleapptainer
+software_backend: apptainer
 software_environments:
   clustbench:
     description: "clustbench on py3.12.6"
