@@ -158,7 +158,7 @@ stages:
           commit: 6090043
         parameters:
           - values: ["--method", "genie", "--gini_threshold", 0.5]
-          - # values: ["--method", "gic"]
+          # -  values: ["--method", "gic"]
           # - values: ["--method", "ica"]
       - id: fcps
         name: "fcps"
