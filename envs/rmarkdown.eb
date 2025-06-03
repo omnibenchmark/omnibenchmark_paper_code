@@ -8,7 +8,7 @@ version = '0.1.0'
 versionsuffix = '-r-%(rver)s'
 
 homepage = 'https://omnibenchmark.org'
-description = 'rmarkdown bundle for clustbench reports'
+description = 'rmarkdown bundle for clustbench reports, R 4.4.2 BioC 3.21'
 
 toolchain = {'name': 'gfbf', 'version': '2024a'}
 
@@ -21,7 +21,7 @@ exts_default_options = {
         'https://cloud.r-project.org/src/contrib/',
         'https://cran.r-project.org/src/contrib/',  				# current version of packages
         'https://cran.r-project.org/src/contrib/Archive/%(name)s',  		# package archive
-        'https://www.bioconductor.org/packages/release/bioc/src/contrib/',      # bioconductor
+        'https://bioconductor.org/packages/3.21/bioc/src/contrib/Archive',      # bioconductor 3.21
     ],
     'sources': ['%(name)s_%(version)s.tar.gz'],
 }

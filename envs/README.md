@@ -58,3 +58,4 @@ Lorem ipsum.
 3. `python3-wget` from pypi doesn't look very well maintaned
 4. `eb fcps.eb --robot`
 5. `eb clustbench.eb --robot`
+6. `eb rmarkdown.eb --robot` 
