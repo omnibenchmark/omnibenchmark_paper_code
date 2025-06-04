@@ -4,7 +4,7 @@ name: oras
 #   cancel-in-progress: true
 
 on:
-  pull_request:
+  # pull_request:
   workflow_dispatch:
   schedule:
     - cron: "30 1 * * *" # at 1.30am
@@ -21,6 +21,7 @@ jobs:
     strategy:
       matrix:
         ob_branch: [main]
+        micromamba-version: ['2.1.1-0']
       fail-fast: false
     concurrency:
       group: oras-${{ matrix.micromamba-version }}-${{ matrix.ob_branch }}

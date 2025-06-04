@@ -26,5 +26,6 @@ run_with_default_envs:
 ## derived from Mark's plots to process multiple benchmark runs at once
 knit_report: 
 	## todo incorporate this report to this repo, downloading from a temporary branch `mark` is a bad idea
+	## also control the environment this is run with
 	wget -nc https://raw.githubusercontent.com/imallona/clustering_report/refs/heads/mark/07_metrics_across_backends.Rmd
 	R -e 'rmarkdown::render("07_metrics_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
