@@ -1,4 +1,4 @@
-id: clustering_example_conda
+id: clustering_example_envmodules
 description: Clustering benchmark on Gagolewski's, true number of clusters plus minus 2.
 version: 1.4
 benchmarker: "Izaskun Mallona, Daniel Incicau, Ben Carrillo"
@@ -18,13 +18,13 @@ software_environments:
     conda: envs/fcps.yml
     apptainer: oras://registry.renkulab.io/izaskun.mallona/clustering_example/fcps:latest
     envmodule: fcps
-  rmarkdown:
-    description: "rmarkdown on R 4.4.2"
-    envmodule: rmarkdown
+  # rmarkdown:
+  #   description: "rmarkdown on R 4.4.2"
+  #   envmodule: rmarkdown
 metric_collectors:
   - id: plotting
     name: "Single-backend metric collector."
-    software_environment: "rmarkdown"
+    software_environment: "fcps"
     repository:
       url: https://github.com/imallona/clustering_report
       commit: bbb9d56

@@ -6,7 +6,7 @@ OB_CMD=ob run benchmark --local --cores ${MAX_CORES} --yes
 # prepare_apptainer_env:
 # 	cd envs && bash build_singularity.sh
 
-all: run_with_default_conda run_with_unpinned_oras knit_report
+all: run_with_default_conda run_with_unpinned_oras run_with_default_envs knit_report
 
 run_with_default_conda:
 	${OB_CMD} -b Clustering_conda.yml
@@ -18,8 +18,13 @@ run_with_unpinned_oras:
 	cp Clustering_oras.yml out
 	mv out out_singularity_$(shell date +'%Y%m%d_%H%M')
 
+run_with_default_envs:
+	${OB_CMD} -b Clustering_envmodules.yml
+	cp Clustering_envmodules.yml out
+	mv out out_envmodules_$(shell date +'%Y%m%d_%H%M')
+
 ## derived from Mark's plots to process multiple benchmark runs at once
-knit_report:
+knit_report: 
 	## todo incorporate this report to this repo, downloading from a temporary branch `mark` is a bad idea
 	wget -nc https://raw.githubusercontent.com/imallona/clustering_report/refs/heads/mark/07_metrics_across_backends.Rmd
 	R -e 'rmarkdown::render("07_metrics_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'

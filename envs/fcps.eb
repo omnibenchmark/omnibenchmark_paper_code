@@ -198,7 +198,9 @@ exts_list = [
     ('mclust', '6.1.1', {
         'checksums': ['ddd7018e5e6ea7f92c7fc9872b391491b7e91c2cd89ef1dcaf4408afb5116775'],
     }),
-    ('cclust', '0.6-26'),
+    ('cclust', '0.6-26', {
+        'checksums': ['92ec3c55a1864e4e1a4706bfdef8ad00727c720213ac656c718e867286b29857'],
+    }),
     ('flowClust', '3.40.0', {
         'installopts': "--configure-args='--with-gsl=${EBROOTGSL} --enable-bundled-gsl=false'",
         'checksums': ['7e699b06e378e32144704dbec18289109980b0f5eca166180f2c30007b83e0f5'],
@@ -231,13 +233,49 @@ exts_list = [
     ('FCPS', version, {
         'checksums': ['d1e5e06700a81fe529f52ef1f65977d3c786f33df262f4f89238d2622dc7ba97'],
     }),
+    ('codetools', '0.2-20', {
+        'checksums': ['3be6f375ec178723ddfd559d1e8e85bfeee04a5fbaf9f53f2f844e1669fea863'],
+    }),
+    ('iterators', '1.0.14', {
+        'checksums': ['cef3075a0930e1408c764e4da56bbadd4f7d14315809df8f38dd51f80ccc677b'],
+    }),
+    ('foreach', '1.5.2', {
+        'checksums': ['56338d8753f9f68f262cf532fd8a6d0fe25a71a2ff0107f3ce378feb926bafe4'],
+    }),
+    ('data.table', '1.17.4', {
+        'checksums': ['396eb2a0e38249310070b60cc6c4e930f2cfc940e6ad0ac62c4c7a5b16390753'],
+    }),
+    ('ModelMetrics', '1.2.2.2', {
+        'checksums': ['5e06f1926aebca5654e1329c66ef19b04058376b2277ebb16e3bf8c208d73457'],
+    }),
+    ('generics', '0.1.3', {
+        'checksums': ['75046163bfa8b8a4f4214c1b689e796207f6447182f2e5062cf570302387d053'],
+    }),
+    ('tidyselect', '1.2.1', {
+        'checksums': ['169e97ba0bbfbcdf4a80534322751f87a04370310c40e27f04aac6525d45903c'],
+    }),
+    ('dplyr', '1.1.4', {
+        'checksums': ['cf730414d5d4ab387b4e9890a4b1df9d17a3903488e8da8df1cf2e11e44558cb'],
+    }),
+    ('timechange', '0.3.0', {
+        'checksums': ['d85c0b5514ab9578d16032e703c33f197feaed1a424c834ebfcbf0ad46ae46b4'],
+    }),
+    ('lubridate', '1.9.3', {
+        'checksums': ['2b6e1406d231b0a14d60b99cc406d159fea5465a5694725ad25343f12cf37fff'],
+    }),
+    ('tidyr', '1.3.1', {
+        'checksums': ['e820c261cb5543f572f49276a7bdc7302aa4215da4bf850b1b939a315353835d'],
+    }),
+    ('jsonlite', '2.0.0', {
+        'checksums': ['75eb910c82b350ec33f094779da0f87bff154c232e4ae39c9896a9b89f3ac82d'],
+    }),
 ]
 
 modextrapaths = {'R_LIBS_SITE': ''}
 
 sanity_check_paths = {
     'files': [],
-    'dirs': ['FCPS', 'dbscan', 'energy', 'protoclust'],
+    'dirs': ['FCPS', 'dbscan', 'energy', 'protoclust', 'jsonlite', 'tidyr', 'dplyr'],
 }
 
 moduleclass = 'bio'

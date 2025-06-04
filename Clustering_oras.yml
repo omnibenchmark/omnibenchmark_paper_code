@@ -1,11 +1,11 @@
-id: clustering_example_conda
+id: clustering_example_oras
 description: Clustering benchmark on Gagolewski's, true number of clusters plus minus 2.
 version: 1.4
 benchmarker: "Izaskun Mallona, Daniel Incicau, Ben Carrillo"
 storage: http://omnibenchmark.org:9000
 benchmark_yaml_spec: 0.04
 storage_api: S3
-storage_bucket_name: clusteringexampleapptainer
+storage_bucket_name: clusteringexampleoras
 software_backend: apptainer
 software_environments:
   clustbench:
