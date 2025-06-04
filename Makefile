@@ -6,7 +6,7 @@ OB_CMD=ob run benchmark --local --cores ${MAX_CORES} --yes
 # prepare_apptainer_env:
 # 	cd envs && bash build_singularity.sh
 
-all: run_with_default_conda run_with_unpinned_oras run_with_default_envs knit_report
+all: run_with_default_conda run_with_unpinned_oras run_with_default_envs # knit_report
 
 run_with_default_conda:
 	${OB_CMD} -b Clustering_conda.yml
@@ -29,3 +29,5 @@ knit_report:
 	## also control the environment this is run with
 	wget -nc https://raw.githubusercontent.com/imallona/clustering_report/refs/heads/mark/07_metrics_across_backends.Rmd
 	R -e 'rmarkdown::render("07_metrics_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
+	wget -nc https://github.com/imallona/clustering_report/blob/mark/08_performances_across_backends.Rmd
+	R -e 'rmarkdown::render("08_performances_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
