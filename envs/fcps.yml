@@ -23,3 +23,5 @@ dependencies:
   - bioconda::bioconductor-complexheatmap
   - conda-forge::r-jsonlite
   - conda-forge::r-dplyr
+  - pip:
+      - "denet==0.3.2"
