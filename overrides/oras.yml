@@ -1,0 +1,5 @@
+# this file has been generated automatically - DO NOT EDIT BY HAND
+id: clustering_benchmark_apptainer
+description: Clustering benchmark on Gagolewski's. Using apptainer from quay.io
+software_backend: apptainer
+
