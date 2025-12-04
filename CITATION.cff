@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: "omnibenchmark_paper_code"
+type: software
+authors:
+  - family-names: "Mallona"
+    given-names: "Izaskun"
+    orcid: "https://orcid.org/0000-0002-XXXX-XXXX"
+  - family-names: "Incicau"
+    given-names: "Daniel"
+  - family-names: "Carrillo"
+    given-names: "Ben"
+  - family-names: "Gerber"
+    given-names: "Reto"
+  - family-names: "Robinson"
+    given-names: "Mark D"
+repository-code: "https://github.com/omnibenchmark/omnibenchmark_paper_code"
+license: "MIT"
+keywords:
+  - "benchmarking"
+  - "clustering"
+  - "reproducibility"
+  - "omnibenchmark"
+abstract: "Code to reproduce analysis and figures from the omnibenchmark preprint."
