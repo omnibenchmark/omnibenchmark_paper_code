@@ -1,0 +1,300 @@
+---
+title: "Clustbench Performance Analysis"
+output:
+  pdf_document: default
+  html_document: default
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(jsonlite)
+```
+
+## Load Data
+
+```{r load-data}
+# Run the Python script and capture JSON output
+json_output <- system("python3 parse_results.py 2>/dev/null", intern = TRUE)
+json_text <- paste(json_output, collapse = "\n")
+
+# Parse JSON
+results_list <- fromJSON(json_text, flatten = FALSE)
+
+# Convert to data frame
+df <- results_list %>%
+  # Unnest performance metrics into columns (already numeric from Python)
+  mutate(
+    # Extract performance metrics
+    runtime_s = performance$s,
+    max_rss = performance$max_rss,
+    max_vms = performance$max_vms,
+    max_uss = performance$max_uss,
+    max_pss = performance$max_pss,
+    io_in = performance$io_in,
+    io_out = performance$io_out,
+    mean_load = performance$mean_load,
+    cpu_time = performance$cpu_time
+  ) %>%
+  # Select relevant columns
+  select(backend, rep, generator, dataset_name, method, method_params, method_full,
+         runtime_s, max_rss, max_vms, max_uss, max_pss, 
+         io_in, io_out, mean_load, cpu_time, metrics)
+
+# Display summary
+glimpse(df)
+head(df)
+```
+
+## Summary Statistics
+
+```{r summary}
+summary(df %>% select(runtime_s, max_rss, cpu_time, mean_load))
+```
+
+## Metrics Analysis
+
+```{r extract-metrics}
+# Helper function to safely extract metric value
+get_metric_value <- function(metrics, family, metric_name, k) {
+  tryCatch({
+    if (is.null(metrics)) return(NA)
+    if (is.null(metrics[[family]])) return(NA)
+    if (is.null(metrics[[family]][[metric_name]])) return(NA)
+    
+    # Check for error field
+    metric_data <- metrics[[family]][[metric_name]]
+    if (!is.null(metric_data$error)) return(NA)
+    
+    # Get value for k
+    value <- metric_data[[as.character(k)]]
+    if (is.null(value)) return(NA)
+    return(as.numeric(value))
+  }, error = function(e) {
+    return(NA)
+  })
+}
+
+# Extract all unique metric families and names from the data
+all_families <- unique(unlist(lapply(results_list$metrics, names)))
+all_metrics <- list()
+for (fam in all_families) {
+  if (!is.null(fam)) {
+    metrics_in_family <- unique(unlist(lapply(results_list$metrics, function(m) {
+      if (!is.null(m[[fam]])) names(m[[fam]]) else NULL
+    })))
+    all_metrics[[fam]] <- metrics_in_family[!is.null(metrics_in_family)]
+  }
+}
+
+# Create metrics dataframe with same columns as performance df
+metrics_df <- results_list %>%
+  rowwise() %>%
+  mutate(
+    # Extract partition metrics for k=2, k=3, k=4
+    nca_k2 = get_metric_value(metrics, "partition_metrics", "normalized_clustering_accuracy", 2),
+    nca_k3 = get_metric_value(metrics, "partition_metrics", "normalized_clustering_accuracy", 3),
+    nca_k4 = get_metric_value(metrics, "partition_metrics", "normalized_clustering_accuracy", 4),
+    afm_k2 = get_metric_value(metrics, "partition_metrics", "adjusted_fm_score", 2),
+    afm_k3 = get_metric_value(metrics, "partition_metrics", "adjusted_fm_score", 3),
+    afm_k4 = get_metric_value(metrics, "partition_metrics", "adjusted_fm_score", 4)
+  ) %>%
+  ungroup() %>%
+  select(backend, rep, generator, dataset_name, method, method_params, method_full,
+         nca_k2, nca_k3, nca_k4, afm_k2, afm_k3, afm_k4)
+
+head(metrics_df)
+glimpse(metrics_df)
+
+# Summary of metrics by method
+metrics_df %>%
+  group_by(method) %>%
+  summarise(
+    count = n(),
+    mean_nca_k2 = mean(nca_k2, na.rm = TRUE),
+    mean_afm_k2 = mean(afm_k2, na.rm = TRUE),
+    na_count = sum(is.na(nca_k2))
+  ) %>%
+  arrange(desc(mean_nca_k2))
+```
+
+### Metrics by Method
+
+```{r plot-metrics-method, fig.width=10, fig.height=8}
+metrics_long <- metrics_df %>%
+  pivot_longer(
+    cols = c(nca_k2, nca_k3, nca_k4, afm_k2, afm_k3, afm_k4),
+    names_to = "metric",
+    values_to = "score"
+  ) %>%
+  separate(metric, into = c("metric_type", "k"), sep = "_") %>%
+  mutate(
+    metric_type = case_when(
+      metric_type == "nca" ~ "Normalized Clustering Accuracy",
+      metric_type == "afm" ~ "Adjusted FM Score",
+      TRUE ~ metric_type
+    )
+  )
+
+ggplot(metrics_long %>% filter(!is.na(score)), 
+       aes(x = method, y = score, fill = k)) +
+  geom_boxplot() +
+  facet_wrap(~metric_type, scales = "free_y") +
+  theme_minimal() +
+  labs(
+    title = "Clustering Metrics by Method",
+    x = "Method",
+    y = "Score",
+    fill = "K"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Runtime vs Accuracy Trade-off
+
+```{r plot-runtime-accuracy, fig.width=10, fig.height=6}
+ggplot(metrics_df %>% filter(!is.na(nca_k2)), 
+       aes(x = runtime_s, y = nca_k2, color = method, shape = backend)) +
+  geom_point(size = 3, alpha = 0.7) +
+  theme_minimal() +
+  labs(
+    title = "Runtime vs Clustering Accuracy Trade-off (k=2)",
+    x = "Runtime (seconds)",
+    y = "Normalized Clustering Accuracy",
+    color = "Method",
+    shape = "Backend"
+  )
+```
+
+## Performance by Method
+
+```{r performance-by-method}
+df %>%
+  group_by(method) %>%
+  summarise(
+    count = n(),
+    mean_runtime = mean(runtime_s, na.rm = TRUE),
+    median_runtime = median(runtime_s, na.rm = TRUE),
+    mean_memory = mean(max_rss, na.rm = TRUE),
+    mean_cpu = mean(cpu_time, na.rm = TRUE)
+  ) %>%
+  arrange(mean_runtime)
+```
+
+## Visualizations
+
+### Runtime by Method
+
+```{r plot-runtime-method, fig.width=10, fig.height=6}
+ggplot(df, aes(x = method, y = runtime_s, fill = method)) +
+  geom_boxplot() +
+  facet_wrap(~backend) +
+  theme_minimal() +
+  labs(
+    title = "Runtime by Method and Backend",
+    x = "Method",
+    y = "Runtime (seconds)"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Memory Usage by Method
+
+```{r plot-memory-method, fig.width=10, fig.height=6}
+ggplot(df, aes(x = method, y = max_rss, fill = method)) +
+  geom_boxplot() +
+  facet_wrap(~backend) +
+  theme_minimal() +
+  labs(
+    title = "Memory Usage (RSS) by Method and Backend",
+    x = "Method",
+    y = "Max RSS (MB)"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Runtime vs Memory
+
+```{r plot-runtime-memory, fig.width=10, fig.height=6}
+ggplot(df, aes(x = runtime_s, y = max_rss, color = method, shape = backend)) +
+  geom_point(size = 3, alpha = 0.7) +
+  theme_minimal() +
+  labs(
+    title = "Runtime vs Memory Usage",
+    x = "Runtime (seconds)",
+    y = "Max RSS (MB)",
+    color = "Method",
+    shape = "Backend"
+  )
+```
+
+### CPU Time vs Runtime
+
+```{r plot-cpu-runtime, fig.width=10, fig.height=6}
+ggplot(df, aes(x = runtime_s, y = cpu_time, color = method)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray") +
+  facet_wrap(~backend) +
+  theme_minimal() +
+  labs(
+    title = "CPU Time vs Runtime",
+    x = "Runtime (seconds)",
+    y = "CPU Time (seconds)",
+    color = "Method",
+    caption = "Dashed line shows 1:1 ratio"
+  )
+```
+
+### Mean Load by Method
+
+```{r plot-load-method, fig.width=10, fig.height=6}
+ggplot(df, aes(x = method, y = mean_load, fill = backend)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(
+    title = "Mean CPU Load by Method",
+    x = "Method",
+    y = "Mean Load (%)",
+    fill = "Backend"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Performance by Dataset
+
+```{r plot-runtime-dataset, fig.width=10, fig.height=6}
+ggplot(df, aes(x = dataset_name, y = runtime_s, fill = method)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  facet_wrap(~backend) +
+  theme_minimal() +
+  labs(
+    title = "Runtime by Dataset and Method",
+    x = "Dataset",
+    y = "Runtime (seconds)",
+    fill = "Method"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Backend Comparison
+
+```{r backend-comparison}
+df %>%
+  group_by(backend, method) %>%
+  summarise(
+    mean_runtime = mean(runtime_s, na.rm = TRUE),
+    mean_memory = mean(max_rss, na.rm = TRUE)
+  ) %>%
+  pivot_wider(
+    names_from = backend,
+    values_from = c(mean_runtime, mean_memory)
+  )
+```
+
+## Export Data
+
+```{r export}
+# Save as CSV for further analysis
+write_csv(df, "clustbench_performance.csv")
+```
