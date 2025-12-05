@@ -1,33 +1,122 @@
+# ============================================================
+# Seed and result stability Makefile
+#
+# Run with `make`
+#
+# Key features:
+# - seeds: benchmarks are repeated with multiple random seeds
+#   (2, 54, 546, 744, 1443) to ensure reproducibility.
+# - runs: for each seed, three independent runs are
+#   executed to capture variability in performance.
+# - output dirs: results are stored in directories
+#   named according to backend, seed, and run number.
+#
+# Targets:
+#   all             clone repos, run benchmarks, knit reports
+#   run_conda       run conda backend with seeds + repeats
+#   run_oras        run oras backend with seeds + repeats
+#   run_envs        run envmodules backend with seeds + repeats
+#   knit_report     generate RMarkdown reports - not fully tested
+#
+# Environment:
+# - MAX_CORES controls parallelism (default: 50).
+# - EASYBUILD_PREFIX needs to be tuned to access the envmodules built extending EESSI <--------------!!!!
+#    see: https://github.com/omnibenchmark/clustering_example/pull/43
+#
+# ============================================================
+
+
 MAX_CORES ?= 50
 
-# without continue on error (-k)
-OB_CMD=ob run benchmark --local --cores ${MAX_CORES} --yes
+# EasyBuild installation prefix (imallona; edit accordingly)
+EASYBUILD_PREFIX ?= /data/imallona/.local/easybuild
+export EASYBUILD_PREFIX
 
-# prepare_apptainer_env:
-# 	cd envs && bash build_singularity.sh
+# omnibenchmark command template
+OB_CMD = ob run benchmark --local-storage --cores ${MAX_CORES}
 
-all: run_with_default_conda run_with_unpinned_oras run_with_default_envs # knit_report
+# actual benchmark plan repository - to be pinned (the commit/tag)
+CLUSTERING_REPO = https://github.com/omnibenchmark/clustering_example
+CLUSTERING_DIR	= clustering_example
 
-run_with_default_conda:
-	${OB_CMD} -b Clustering_conda.yml
-	cp Clustering_conda.yml out
-	mv out out_conda_$(shell date +'%Y%m%d_%H%M')
+# legacy reports in the wrong repository; to be moved to this one
+REPORTS_REPO = https://github.com/imallona/clustering_report
+REPORTS_DIR = clustering_report
 
-run_with_unpinned_oras:
-	${OB_CMD} -b Clustering_oras.yml
-	cp Clustering_oras.yml out
-	mv out out_singularity_$(shell date +'%Y%m%d_%H%M')
+all: clone_yamls clone_reports run_conda run_oras run_envs knit_report
 
-run_with_default_envs:
-	${OB_CMD} -b Clustering_envmodules.yml
-	cp Clustering_envmodules.yml out
-	mv out out_envmodules_$(shell date +'%Y%m%d_%H%M')
+# clone the clustering_example repo if not already present
+clone_yamls:
+	@if [ ! -d "$(CLUSTERING_DIR)" ]; then \
+		echo "Cloning clustering_example repo..."; \
+		git clone --branch easyconfigs_py3126 $(CLUSTERING_REPO); \
+	else \
+		echo "clustering_example repo already present, pulling latest..."; \
+		cd $(CLUSTERING_DIR) && git fetch && git checkout easyconfigs_py3126 && git pull; \
+	fi
 
-## derived from Mark's plots to process multiple benchmark runs at once
-knit_report: 
-	## todo incorporate this report to this repo, downloading from a temporary branch `mark` is a bad idea
-	## also control the environment this is run with
-	wget -nc https://raw.githubusercontent.com/imallona/clustering_report/refs/heads/mark/07_metrics_across_backends.Rmd
-	R -e 'rmarkdown::render("07_metrics_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
-	wget -nc https://github.com/imallona/clustering_report/blob/mark/08_performances_across_backends.Rmd
-	R -e 'rmarkdown::render("08_performances_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
+# clone the clustering_report repo (mark branch) if not already present
+clone_reports:
+	@if [ ! -d "$(REPORTS_DIR)" ]; then \
+		echo "Cloning clustering_report repo (branch mark)..."; \
+		git clone --branch mark $(REPORTS_REPO) $(REPORTS_DIR); \
+	else \
+		echo "clustering_report repo already present, pulling latest..."; \
+		cd $(REPORTS_DIR) && git pull; \
+	fi
+
+run_conda: clone_yamls
+	@for seed in 2 54 546 744 1443; do \
+		echo "Running conda benchmark with seed $$seed..."; \
+		cp $(CLUSTERING_DIR)/Clustering_conda.yml $(CLUSTERING_DIR)/Clustering_conda_tmp.yml; \
+		sed -i "s/--seed, [0-9]\+/--seed, $$seed/" $(CLUSTERING_DIR)/Clustering_conda_tmp.yml; \
+		for i in 1 2 3; do \
+			echo "  Run $$i for seed $$seed..."; \
+			${OB_CMD} -b $(CLUSTERING_DIR)/Clustering_conda_tmp.yml; \
+			cp $(CLUSTERING_DIR)/Clustering_conda_tmp.yml out; \
+			mv out out_conda_seed_$$seed\_run_$$i; \
+		done; \
+	rm $(CLUSTERING_DIR)/Clustering_conda_tmp.yml; \
+	done
+
+run_oras: clone_yamls
+	@for seed in 2 54 546 744 1443; do \
+		echo "Running oras benchmark with seed $$seed..."; \
+		cp $(CLUSTERING_DIR)/Clustering_oras.yml $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
+		sed -i "s/--seed, [0-9]\+/--seed, $$seed/" $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
+		for i in 1 2 3; do \
+			echo "  Run $$i for seed $$seed..."; \
+			${OB_CMD} -b $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
+			cp $(CLUSTERING_DIR)/Clustering_oras_tmp.yml out; \
+			mv out out_oras_seed_$$seed\_run_$$i; \
+		done; \
+	rm $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
+	done
+
+run_envs: clone_yamls
+	@bash -c '\
+		source /cvmfs/software.eessi.io/versions/2025.06/init/lmod/bash && \
+		module load EESSI-extend/2025.06-easybuild && \
+		export MODULEPATH="$(EASYBUILD_PREFIX)/software/modules/all:$$MODULEPATH" && \
+		module use $$MODULEPATH && \
+                echo $$MODULEPATH && \
+		for seed in 2 54 546 744 1443; do \
+			echo "Running envmodules benchmark with seed $$seed..."; \
+			cp $(CLUSTERING_DIR)/Clustering_envmodules.yml $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
+			sed -i "s/--seed, [0-9]\+/--seed, $$seed/" $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
+			for i in 1 2 3; do \
+				echo "  Run $$i for seed $$seed..."; \
+				${OB_CMD} -b $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
+				cp $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml out; \
+				mv out out_envmodules_seed_$$seed\_run_$$i; \
+			done; \
+			rm $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
+		done \
+	'
+
+
+knit_report: clone_reports
+	R -e 'rmarkdown::render("$(REPORTS_DIR)/07_metrics_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
+	R -e 'rmarkdown::render("$(REPORTS_DIR)/08_performances_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
+	python parse_results.py
+	R -e 'rmarkdown::render("analyze_results.Rmd")'
