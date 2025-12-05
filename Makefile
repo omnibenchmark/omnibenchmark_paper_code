@@ -74,7 +74,7 @@ run_conda: clone_yamls
 			echo "  Run $$i for seed $$seed..."; \
 			${OB_CMD} -b $(CLUSTERING_DIR)/Clustering_conda_tmp.yml; \
 			cp $(CLUSTERING_DIR)/Clustering_conda_tmp.yml out; \
-			mv out out_conda__seed_$$seed\_run_$$i; \
+			mv out out_conda_seed_$$seed\_run_$$i; \
 		done; \
 	rm $(CLUSTERING_DIR)/Clustering_conda_tmp.yml; \
 	done
@@ -88,7 +88,7 @@ run_oras: clone_yamls
 			echo "  Run $$i for seed $$seed..."; \
 			${OB_CMD} -b $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
 			cp $(CLUSTERING_DIR)/Clustering_oras_tmp.yml out; \
-			mv out out_oras__seed_$$seed\_run_$$i; \
+			mv out out_oras_seed_$$seed\_run_$$i; \
 		done; \
 	rm $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
 	done
@@ -108,7 +108,7 @@ run_envs: clone_yamls
 				echo "  Run $$i for seed $$seed..."; \
 				${OB_CMD} -b $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
 				cp $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml out; \
-				mv out out_envmodules_$$(date +'%Y%m%d_%H%M')_seed$$seed\_run$$i; \
+				mv out out_envmodules_seed_$$seed\_run_$$i; \
 			done; \
 			rm $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
 		done \
