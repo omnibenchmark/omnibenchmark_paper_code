@@ -119,4 +119,4 @@ knit_report: clone_reports
 	# R -e 'rmarkdown::render("$(REPORTS_DIR)/07_metrics_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
 	# R -e 'rmarkdown::render("$(REPORTS_DIR)/08_performances_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
 	python parse_results.py > aggregated_results.json
-	R -e 'rmarkdown::render("analyze_results.Rmd")'
+	R -e 'rmarkdown::render("analyze_results_izaskun.Rmd")'

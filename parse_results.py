@@ -62,7 +62,7 @@ def parse_result_path(path: Path) -> Dict[str, str]:
     parts = path.parts
     result: Dict[str, str] = {}
 
-    # Parse out_{backend}_seed_{seed}_run_{run}
+    # parse out_{backend}_seed_{seed}_run_{run}
     out_match = re.match(
         r"out_(?P<backend>[a-zA-Z0-9]+)_seed_(?P<seed>\d+)_run_(?P<run>\d+)",
         parts[0])
@@ -155,7 +155,7 @@ def parse_metric_scores(scores_file: Path) -> Optional[Dict[str, float]]:
         k_strings = [k.strip() for k in lines[0].strip().split(',')]
         k_values = []
         for k_str in k_strings:
-            match = re.match(r'k=(\d+)', k_str)
+            match = re.match(r'.*k=(\d+)*', k_str)
             if match:
                 k_values.append(int(match.group(1)))
             else:

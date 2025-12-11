@@ -1,0 +1,119 @@
+---
+title: "Clustbench Performance Analysis"
+output:
+  html_document: default
+date: "`r Sys.Date()`"
+---
+
+```{r setup, include=TRUE}
+library(knitr)
+library(tidyverse)
+library(jsonlite)
+
+
+knitr::opts_chunk$set(
+  echo    = TRUE,
+  warning = TRUE,
+  message = TRUE,
+  fig.path = "plots/",
+  dev = c("png", "svg"),
+  fig.width  = 6,
+  fig.height = 6)
+
+
+```
+
+## Load Data
+
+```{r load-data}
+# Run the Python script and capture JSON output
+json_output <- system("python3 parse_results.py 2>/dev/null", intern = TRUE)
+json_text <- paste(json_output, collapse = "\n")
+```
+
+
+```{r}
+# flatten configurations into long rows of param_name/param_value
+flatten_configurations <- function(cfgs) {
+  if (is.null(cfgs) || length(cfgs) == 0) {
+    return(data.frame(parameter_dir = NA_character_,
+                      param_name    = NA_character_,
+                      param_value   = NA_character_,
+                      stringsAsFactors = FALSE))
+  }
+  out <- data.frame()
+  for (cfg in cfgs) {
+    parameter_dir <- cfg$parameter_dir
+    params <- cfg$parameters
+    if (is.data.frame(params)) params <- as.list(params)
+    flat <- unlist(params, use.names = TRUE)
+    for (p in names(flat)) {
+      out <- rbind(out, data.frame(
+        parameter_dir = parameter_dir,
+        param_name    = p,
+        param_value   = as.character(flat[[p]]),
+        stringsAsFactors = FALSE
+      ))
+    }
+  }
+  out
+}
+
+flatten_record <- function(rec) {
+  pm   <- rec$metrics$partition_metrics
+  perf <- rec$performance
+  cfg_df <- flatten_configurations(rec$configurations)
+
+  rows <- list()
+  idx  <- 0
+
+  for (metric_name in names(pm)) {
+    metric_vals <- pm[[metric_name]]
+    for (k in names(metric_vals)) {
+      for (i in seq_len(nrow(cfg_df))) {
+        idx <- idx + 1
+        rows[[idx]] <- data.frame(
+          backend      = rec$backend,
+          seed         = rec$seed,
+          run          = rec$run,
+          generator    = rec$generator,
+          dataset_name = rec$dataset_name,
+          method       = rec$method,
+          path         = rec$path,
+          method_params= rec$method_params,
+          method_full  = rec$method_full,
+          parameter_dir= cfg_df$parameter_dir[i],
+          param_name   = cfg_df$param_name[i],
+          param_value  = cfg_df$param_value[i],
+          k            = as.integer(k),
+          metric_name  = metric_name,
+          metric_value = metric_vals[[k]],
+          # performance metrics
+          s        = perf$s,
+          h_m_s    = perf[["h:m:s"]],
+          max_rss  = perf$max_rss,
+          max_vms  = perf$max_vms,
+          max_uss  = perf$max_uss,
+          max_pss  = perf$max_pss,
+          io_in    = perf$io_in,
+          io_out   = perf$io_out,
+          mean_load= perf$mean_load,
+          cpu_time = perf$cpu_time,
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+  }
+  do.call(rbind, rows)
+}
+
+records <- jsonlite::fromJSON(json_output, simplifyVector = FALSE)
+
+fd <- do.call(rbind, lapply(records, flatten_record))
+
+head(fd)
+
+table(fd$param_name)
+write.csv(fd, file = 'aggregated_results.csv')
+
+```
