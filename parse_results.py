@@ -13,40 +13,83 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 
+# def parse_result_path(path: Path) -> Dict[str, str]:
+#     """
+#     Parse a result path and extract components.
+    
+#     """
+#     parts = path.parts
+
+#     # print(pars)
+    
+#     result = {}
+
+#     # Parse out-{backend}-{rep}
+#     out_match = re.match( r"out_(?P<backend>[a-zA-Z0-9]+)_seed_(?P<seed>\d+)_run_(?P<run>\d+)", parts)
+#     if out_match:
+#         result['backend'] = out_match.group(1)
+#         result['seed'] = out_match.group(2)
+#         result['rep'] = out_match.group(3)
+
+#     # Find dataset_generator part
+#     for part in parts:
+#         if part.startswith('dataset_generator-'):
+#             # Parse dataset_generator-{generator}_dataset_name-{name}
+#             dataset_match = re.match(r'dataset_generator-([^_]+)_dataset_name-(.+)', part)
+#             if dataset_match:
+#                 result['generator'] = dataset_match.group(1)
+#                 result['dataset_name'] = dataset_match.group(2)
+#             break
+
+#     # The method is the last part (after clustering/)
+#     if 'clustering' in parts:
+#         clustering_idx = parts.index('clustering')
+#         if clustering_idx + 1 < len(parts):
+#             result['method'] = parts[clustering_idx + 1]
+
+#     result['path'] = str(path)
+
+#     return result
+
+
 def parse_result_path(path: Path) -> Dict[str, str]:
     """
-    Parse a result path and extract components.
-
-    Pattern: out-{backend}-{rep}/data/clustbench/dataset_generator-{generator}_dataset_name-{name}/clustering/{method}
+    Parse a result path and extract components:
+    - backend, seed, run (from out_* directories)
+    - dataset generator and dataset name
+    - method (after clustering/)
     """
     parts = path.parts
+    result: Dict[str, str] = {}
 
-    result = {}
+    # Parse out_{backend}_seed_{seed}_run_{run}
+    out_match = re.match(
+        r"out_(?P<backend>[a-zA-Z0-9]+)_seed_(?P<seed>\d+)_run_(?P<run>\d+)",
+        parts[0])
 
-    # Parse out-{backend}-{rep}
-    out_match = re.match(r'out-([^-]+)-(\d+)', parts[0])
     if out_match:
-        result['backend'] = out_match.group(1)
-        result['rep'] = out_match.group(2)
+        result["backend"] = out_match.group("backend")
+        result["seed"] = out_match.group("seed")
+        result["run"] = out_match.group("run")
 
     # Find dataset_generator part
     for part in parts:
-        if part.startswith('dataset_generator-'):
-            # Parse dataset_generator-{generator}_dataset_name-{name}
-            dataset_match = re.match(r'dataset_generator-([^_]+)_dataset_name-(.+)', part)
+        if part.startswith("dataset_generator-"):
+            dataset_match = re.match(
+                r"dataset_generator-([^_]+)_dataset_name-(.+)", part
+            )
             if dataset_match:
-                result['generator'] = dataset_match.group(1)
-                result['dataset_name'] = dataset_match.group(2)
+                result["generator"] = dataset_match.group(1)
+                result["dataset_name"] = dataset_match.group(2)
             break
 
     # The method is the last part (after clustering/)
-    if 'clustering' in parts:
-        clustering_idx = parts.index('clustering')
+    if "clustering" in parts:
+        clustering_idx = parts.index("clustering")
         if clustering_idx + 1 < len(parts):
-            result['method'] = parts[clustering_idx + 1]
+            result["method"] = parts[clustering_idx + 1]
 
-    result['path'] = str(path)
-
+    result["path"] = str(path)
     return result
 
 
@@ -185,7 +228,7 @@ def parse_metrics(param_dir: Path) -> Dict[str, Dict[str, Dict[str, float]]]:
     return metrics
 
 
-def find_results(base_dir: str = '.', pattern: str = 'out-*/data/clustbench/dataset_generator-*/clustering/*') -> List[Dict[str, str]]:
+def find_results(base_dir: str = '.', pattern: str = 'out_*/data/clustbench/dataset_generator-*/clustering/*') -> List[Dict[str, str]]:
     """
     Find all result directories matching the pattern.
 
