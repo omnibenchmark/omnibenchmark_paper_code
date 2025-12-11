@@ -9,7 +9,7 @@ date: "`r Sys.Date()`"
 library(knitr)
 library(tidyverse)
 library(jsonlite)
-
+library(ggplot2)
 
 knitr::opts_chunk$set(
   echo    = TRUE,
@@ -115,5 +115,110 @@ head(fd)
 
 table(fd$param_name)
 write.csv(fd, file = 'aggregated_results.csv')
+
+```
+
+```{r}
+print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
+       aes(x = backend, y = cpu_time, fill = backend)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  theme_minimal(base_size = 14) +
+  labs(title = "CPU time by backend",
+       x = "Backend",
+       y = "CPU Time (s)") +
+  scale_fill_brewer(palette = "Set2"))
+```
+
+
+```{r}
+
+ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
+       aes(x = backend, y = metric_value, color = backend)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  facet_wrap(~metric_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Metrics consistency across backends",
+       x = "Backend",
+       y = "Metric Value") +
+  scale_color_brewer(palette = "Set1")
+```
+
+```{r}
+df_run <- fd %>%
+  select(dataset_name, method, k, metric_name, run, seed, backend, metric_value)
+
+
+# a bit of collapsing here!
+wide_run <- fd %>%
+  filter(backend %in% c("conda","oras","envmodules")) %>%
+  group_by(dataset_name, method, k, metric_name, run, seed, backend) %>%
+  summarise(metric_value = mean(as.numeric(metric_value), na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = backend, values_from = metric_value)
+
+# Check structure
+str(wide_run)
+
+cors_run <- wide_run %>%
+  group_by(metric_name) %>%
+  summarise(
+    cor_conda_oras   = cor(conda, oras, use="complete.obs"),
+    cor_conda_envmodules  = cor(conda, envmodules, use="complete.obs"),
+    cor_oras_envmodules = cor(oras, envmodules, use="complete.obs")
+  )
+
+print(cors_run)
+
+```
+
+
+```{r, fig.width = 10, fig.height=10}
+
+perf_metrics <- c("cpu_time","max_rss","max_vms","max_uss",
+                  "max_pss","io_in","io_out","mean_load")
+
+fd_long <- fd %>%
+  filter(backend %in% c("conda","oras","envmodules")) %>%
+  pivot_longer(cols = all_of(perf_metrics),
+               names_to = "metric",
+               values_to = "value")
+
+#  boxplots + jittered scatter, faceted by metric
+ggplot(fd_long, aes(x = backend, y = value, fill = backend)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  geom_jitter(width = 0.2, alpha = 0.1, size = 1, color = "black") +
+  facet_wrap(~metric, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Performance metrics by backend",
+       x = "Backend",
+       y = "Value") +
+  scale_fill_brewer(palette = "Set2")
+
+```
+
+Choice of `k` - we lack the annotation of the true k in the long CSV
+
+
+```{r, fig.height = 10, fig.width = 10}
+
+ggplot(fd, aes(x = factor(k), y = metric_value, fill = method)) +
+  geom_jitter(width = 0.2, alpha = 0.4, size = 1, fill = "black") +
+  facet_grid(method ~ metric_name + dataset_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Clustering metric sensitivity to k",
+       x = "number of clusters k (true or not)",
+       y = "Metric value")
+```
+
+
+
+```{r, fig.height = 10, fig.width = 10}
+ggplot(fd, aes(x = factor(k), y = metric_value, fill = method)) +
+    geom_jitter(width = 0.2, alpha = 0.4, size = 1, color = "black") +
+    facet_grid(dataset_name + method ~ metric_name, scales = "free_y") +
+    theme_minimal(base_size = 14) +
+    labs(title = "Clustering metric sensitivity to k",
+         x = "Number of clusters (k), true or not",
+         y = "Metric value")
+
 
 ```
