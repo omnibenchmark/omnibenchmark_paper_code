@@ -12,46 +12,6 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
-# def parse_result_path(path: Path) -> Dict[str, str]:
-#     """
-#     Parse a result path and extract components.
-    
-#     """
-#     parts = path.parts
-
-#     # print(pars)
-    
-#     result = {}
-
-#     # Parse out-{backend}-{rep}
-#     out_match = re.match( r"out_(?P<backend>[a-zA-Z0-9]+)_seed_(?P<seed>\d+)_run_(?P<run>\d+)", parts)
-#     if out_match:
-#         result['backend'] = out_match.group(1)
-#         result['seed'] = out_match.group(2)
-#         result['rep'] = out_match.group(3)
-
-#     # Find dataset_generator part
-#     for part in parts:
-#         if part.startswith('dataset_generator-'):
-#             # Parse dataset_generator-{generator}_dataset_name-{name}
-#             dataset_match = re.match(r'dataset_generator-([^_]+)_dataset_name-(.+)', part)
-#             if dataset_match:
-#                 result['generator'] = dataset_match.group(1)
-#                 result['dataset_name'] = dataset_match.group(2)
-#             break
-
-#     # The method is the last part (after clustering/)
-#     if 'clustering' in parts:
-#         clustering_idx = parts.index('clustering')
-#         if clustering_idx + 1 < len(parts):
-#             result['method'] = parts[clustering_idx + 1]
-
-#     result['path'] = str(path)
-
-#     return result
-
-
 def parse_result_path(path: Path) -> Dict[str, str]:
     """
     Parse a result path and extract components:
@@ -155,7 +115,7 @@ def parse_metric_scores(scores_file: Path) -> Optional[Dict[str, float]]:
         k_strings = [k.strip() for k in lines[0].strip().split(',')]
         k_values = []
         for k_str in k_strings:
-            match = re.match(r'.*k=(\d+)*', k_str)
+            match = re.match(r'k=(\d+)', k_str)
             if match:
                 k_values.append(int(match.group(1)))
             else:

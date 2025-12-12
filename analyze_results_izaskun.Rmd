@@ -326,3 +326,46 @@ ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method)) +
        y = "perf metric deviation from group mean") +
   scale_color_brewer(palette = "Set1")
 ```
+
+What about the consistency across runs and seeds? e.g., do different seeds produce different results?
+
+First, seeds
+
+```{r}
+fd_seed_summary <- fd %>%
+  group_by(method, dataset_name, metric_name, k, seed) %>%
+  summarise(mean_value = mean(metric_value, na.rm = TRUE),   # average across runs
+            sd_runs    = sd(metric_value, na.rm = TRUE),   # replicate consistency
+            .groups = "drop")
+
+fd_seed_var <- fd_seed_summary %>%
+  group_by(method, dataset_name, metric_name, k) %>%
+  summarise(sd_seeds = sd(mean_value, na.rm = TRUE),      # variability across seeds
+            mean_sd_runs = mean(sd_runs, na.rm = TRUE),      # replicate consistency
+            .groups = "drop")
+
+
+summary(fd_seed_var)
+
+
+ggplot(fd_seed_var, aes(x = metric_name, y = sd_seeds, fill = method)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  theme_minimal(base_size = 14) +
+  labs(title = "seed sensitivity across methods",
+       x = "Metric",
+       y = "seed-driven sd") +
+  scale_fill_brewer(palette = "Set2")
+
+```
+
+Second, runs
+
+```{r}
+ggplot(fd_seed_var, aes(x = metric_name, y = mean_sd_runs, fill = method)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  theme_minimal(base_size = 14) +
+  labs(title = "repeated run sensitivity across methods",
+       x = "Metric",
+       y = "run-driven sd") +
+  scale_fill_brewer(palette = "Set2")
+```

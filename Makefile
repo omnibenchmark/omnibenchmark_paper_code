@@ -36,8 +36,10 @@ export EASYBUILD_PREFIX
 OB_CMD = ob run benchmark --local-storage --cores ${MAX_CORES}
 
 # actual benchmark plan repository - to be pinned (the commit/tag)
-CLUSTERING_REPO = https://github.com/omnibenchmark/clustering_example
-CLUSTERING_DIR	= clustering_example
+CLUSTERING_REPO   = https://github.com/omnibenchmark/clustering_example
+CLUSTERING_BRANCH = longer_yamls
+
+CLUSTERING_DIR	  = clustering_example
 
 # legacy reports in the wrong repository; to be moved to this one
 REPORTS_REPO = https://github.com/imallona/clustering_report
@@ -49,10 +51,10 @@ all: clone_yamls clone_reports run_conda run_oras run_envs knit_report
 clone_yamls:
 	@if [ ! -d "$(CLUSTERING_DIR)" ]; then \
 		echo "Cloning clustering_example repo..."; \
-		git clone --branch easyconfigs_py3126 $(CLUSTERING_REPO); \
+		git clone --branch ${CLUSTERING_BRANCH} $(CLUSTERING_REPO); \
 	else \
 		echo "clustering_example repo already present, pulling latest..."; \
-		cd $(CLUSTERING_DIR) && git fetch && git checkout easyconfigs_py3126 && git pull; \
+		cd $(CLUSTERING_DIR) && git fetch  && git checkout ${CLUSTERING_BRANCH} && git pull; \
 	fi
 
 # clone the clustering_report repo (mark branch) if not already present
