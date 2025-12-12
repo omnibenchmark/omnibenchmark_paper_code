@@ -1,11 +1,11 @@
 ---
-title: "Clustbench Performance Analysis"
+title: "clustbench figure 2"
 output:
   html_document: default
 date: "`r Sys.Date()`"
 ---
 
-```{r setup, include=TRUE}
+```{r setup, message = FALSE}
 library(knitr)
 library(tidyverse)
 library(jsonlite)
@@ -118,6 +118,9 @@ write.csv(fd, file = 'aggregated_results.csv')
 
 ```
 
+
+Oops, is the speed of computing the metric, or of running the method?
+
 ```{r}
 print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
        aes(x = backend, y = cpu_time, fill = backend)) +
@@ -129,8 +132,48 @@ print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
   scale_fill_brewer(palette = "Set2"))
 ```
 
+Clearly the method, so all good:
 
 ```{r}
+print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
+       aes(x = backend, y = cpu_time, fill = backend)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  # add points for each method/params combination
+  geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) +
+  # connect points across backends for same module+params
+  geom_line(aes(group = interaction(method, method_params, seed, run, generator, dataset_name, k)),
+            alpha = 0.1, color = "grey40") +
+  facet_wrap(~metric_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "CPU time by backend",
+       x = "Backend",
+       y = "CPU time (s)") +
+  scale_color_brewer(palette = "Set1")
+)
+```
+
+
+
+```{r}
+print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
+       aes(x = backend, y = cpu_time, fill = backend)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  # add points for each method/params combination
+  geom_point(aes(color = method),
+             alpha = 0.6, position = position_jitter(width = 0.15)) +
+  # connect points across backends for same module+params
+  geom_line(aes(group = interaction(method, method_params, seed, run, generator, dataset_name, k)),
+            alpha = 0.1, color = "grey40") +
+  theme_minimal(base_size = 14) +
+  labs(title = "CPU time by backend",
+       x = "Backend",
+       y = "CPU time (s)") +
+  scale_color_brewer(palette = "Set1")
+)
+```
+
+
+```{r, eval = FALSE}
 
 ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
        aes(x = backend, y = metric_value, color = backend)) +
@@ -142,6 +185,33 @@ ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
        y = "Metric Value") +
   scale_color_brewer(palette = "Set1")
 ```
+
+
+
+```{r}
+
+print(
+  ggplot(fd, aes(x = backend, y = metric_value)) +
+  # boxplots still colored by backend
+  geom_boxplot(aes(fill = backend), outlier.alpha = 0.3) +
+  # points colored by run
+  geom_point(aes(color = run),
+             alpha = 0.6,
+             position = position_jitter(width = 0.15)) +
+  # connect points across backends for same method/params/run/etc.
+  geom_line(aes(group = interaction(method, method_params, seed, run, generator, dataset_name, k),
+                color = run),
+            alpha = 0.2) +
+  facet_wrap(dataset_name ~ metric_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Metrics consistency across backends (stage = methods)",
+       x = "Backend",
+       y = "Metric Value") +
+  scale_fill_brewer(palette = "Set1") +
+  scale_color_brewer(palette = "Dark2"))
+
+```
+
 
 ```{r}
 df_run <- fd %>%
@@ -195,30 +265,64 @@ ggplot(fd_long, aes(x = backend, y = value, fill = backend)) +
 
 ```
 
+Something wrong with method "1" etc here?
+
+
+```{r, fig.width = 10, fig.height = 10}
+fd_long <- fd %>%
+  pivot_longer(cols = all_of(perf_metrics),
+               names_to = "metric",
+               values_to = "value")
+
+ggplot(fd_long, aes(x = backend, y = value)) +
+  # boxplots filled by backend
+  ## geom_boxplot(aes(fill = backend), outlier.alpha = 0.3) +
+  # points colored by method
+  geom_point(aes(color = method),
+             alpha = 0.6,
+             position = position_jitter(width = 0.15)) +
+  # connect points across backends for same method/run/etc.
+  geom_line(aes(group = interaction(method, method_params, seed, run, generator, dataset_name, k),
+                color = run),
+            alpha = 0.1) +
+  facet_wrap(~metric, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Performance metrics by backend",
+       x = "Backend",
+       y = "Value") +
+  scale_fill_brewer(palette = "Set2") +
+  scale_color_brewer(palette = "Dark2")
+
+```
+
+```{r}
+
+table(fd$method)
+```
+
 Choice of `k` - we lack the annotation of the true k in the long CSV
 
 
-```{r, fig.height = 10, fig.width = 10}
+Just use deviations vs mean depending on the k. Ideally this should vs the true number of clusters!
 
-ggplot(fd, aes(x = factor(k), y = metric_value, fill = method)) +
-  geom_jitter(width = 0.2, alpha = 0.4, size = 1, fill = "black") +
-  facet_grid(method ~ metric_name + dataset_name, scales = "free_y") +
+
+```{r, fig.width = 7}
+fd_dev_k <- fd %>%
+  group_by(method, dataset_name, metric_name) %>%
+  mutate(mean_value = mean(metric_value, na.rm = TRUE),
+         deviation_k = metric_value - mean_value) %>%
+  ungroup()
+
+summary(fd_dev_k$deviation_k)
+
+
+ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method)) +
+  geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) +
+  facet_wrap(dataset_name~metric_name, scales = "free_y") +
   theme_minimal(base_size = 14) +
-  labs(title = "Clustering metric sensitivity to k",
-       x = "number of clusters k (true or not)",
-       y = "Metric value")
-```
-
-
-
-```{r, fig.height = 10, fig.width = 10}
-ggplot(fd, aes(x = factor(k), y = metric_value, fill = method)) +
-    geom_jitter(width = 0.2, alpha = 0.4, size = 1, color = "black") +
-    facet_grid(dataset_name + method ~ metric_name, scales = "free_y") +
-    theme_minimal(base_size = 14) +
-    labs(title = "Clustering metric sensitivity to k",
-         x = "Number of clusters (k), true or not",
-         y = "Metric value")
-
-
+  labs(title = "deviation of metric across ks",
+       subtitle = "caution vs mean(method,dataset,metric) value, not true k!",
+       x = "k",
+       y = "perf metric deviation from group mean") +
+  scale_color_brewer(palette = "Set1")
 ```
