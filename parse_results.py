@@ -115,7 +115,8 @@ def parse_metric_scores(scores_file: Path) -> Optional[Dict[str, float]]:
         k_strings = [k.strip() for k in lines[0].strip().split(',')]
         k_values = []
         for k_str in k_strings:
-            match = re.match(r'k=(\d+)', k_str)
+            k_str = k_str.strip('"') 
+            match = re.match(r'k=(\d+)', k_str)            
             if match:
                 k_values.append(int(match.group(1)))
             else:
@@ -136,7 +137,10 @@ def parse_metric_scores(scores_file: Path) -> Optional[Dict[str, float]]:
                     raise ValueError(f'Duplicate k value {k} with different scores: {result[k]} vs {score}')
             else:
                 result[k] = score
-        
+
+        # ## Find the middle column (index = len//2), that contains the true k, and report it
+        # mid_idx = len(k_values) // 2
+        # result['true_k'] = k_values[mid_idx]
         return result
         
     except Exception as e:

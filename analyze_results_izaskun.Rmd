@@ -23,15 +23,6 @@ knitr::opts_chunk$set(
 
 ```
 
-## Load Data
-
-```{r load-data}
-# Run the Python script and capture JSON output
-json_output <- system("python3 parse_results.py 2>/dev/null", intern = TRUE)
-json_text <- paste(json_output, collapse = "\n")
-```
-
-
 ```{r}
 # flatten configurations into long rows of param_name/param_value
 flatten_configurations <- function(cfgs) {
@@ -59,6 +50,20 @@ flatten_configurations <- function(cfgs) {
   out
 }
 
+## given the way we have them, so we aim to provide 5 ks, middle being the true, but pad with 2s on the left
+get_true_k <- function(x) {
+  n <- length(x)
+  if (n == 5) {
+    return(x[3])
+  } else if (n == 4) {
+    return(x[3])
+  } else if (n == 3) {
+    return(x[2])
+  } else {
+    return(x[1])
+  }
+}
+
 flatten_record <- function(rec) {
   pm   <- rec$metrics$partition_metrics
   perf <- rec$performance
@@ -69,6 +74,8 @@ flatten_record <- function(rec) {
 
   for (metric_name in names(pm)) {
     metric_vals <- pm[[metric_name]]
+    true_k <- get_true_k(names(metric_vals))
+    
     for (k in names(metric_vals)) {
       for (i in seq_len(nrow(cfg_df))) {
         idx <- idx + 1
@@ -86,6 +93,7 @@ flatten_record <- function(rec) {
           param_name   = cfg_df$param_name[i],
           param_value  = cfg_df$param_value[i],
           k            = as.integer(k),
+          true_k       = as.integer(true_k),
           metric_name  = metric_name,
           metric_value = metric_vals[[k]],
           # performance metrics
@@ -107,11 +115,12 @@ flatten_record <- function(rec) {
   do.call(rbind, rows)
 }
 
-records <- jsonlite::fromJSON(json_output, simplifyVector = FALSE)
+records <- jsonlite::fromJSON('aggregated_results.json', simplifyVector = FALSE)
 
 fd <- do.call(rbind, lapply(records, flatten_record))
 
 head(fd)
+
 
 table(fd$param_name)
 write.csv(fd, file = 'aggregated_results.csv')
@@ -303,27 +312,49 @@ table(fd$method)
 Choice of `k` - we lack the annotation of the true k in the long CSV
 
 
-Just use deviations vs mean depending on the k. Ideally this should vs the true number of clusters!
+<!-- Just use deviations vs mean depending on the k. Ideally this should vs the true number of clusters! -->
 
 
-```{r, fig.width = 7}
+<!-- ```{r, fig.width = 7} -->
+<!-- fd_dev_k <- fd %>% -->
+<!--   group_by(method, dataset_name, metric_name) %>% -->
+<!--   mutate(mean_value = mean(metric_value, na.rm = TRUE), -->
+<!--          deviation_k = metric_value - mean_value) %>% -->
+<!--   ungroup() -->
+
+<!-- summary(fd_dev_k$deviation_k) -->
+
+
+<!-- ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method)) + -->
+<!--   geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) + -->
+<!--   facet_wrap(dataset_name~metric_name, scales = "free_y") + -->
+<!--   theme_minimal(base_size = 14) + -->
+<!--   labs(title = "deviation of metric across ks", -->
+<!--        subtitle = "caution vs mean(method,dataset,metric) value, not true k!", -->
+<!--        x = "k", -->
+<!--        y = "perf metric deviation from group mean") + -->
+<!--   scale_color_brewer(palette = "Set1") -->
+<!-- ``` -->
+
+```{r}
+
 fd_dev_k <- fd %>%
   group_by(method, dataset_name, metric_name) %>%
-  mutate(mean_value = mean(metric_value, na.rm = TRUE),
-         deviation_k = metric_value - mean_value) %>%
+  # get the metric_value at the true_k for this group
+  mutate(true_value = metric_value[k == true_k][1],
+         deviation_k = metric_value - true_value) %>%
   ungroup()
 
 summary(fd_dev_k$deviation_k)
 
-
 ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method)) +
   geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) +
-  facet_wrap(dataset_name~metric_name, scales = "free_y") +
+  facet_wrap(dataset_name ~ metric_name, scales = "free_y") +
   theme_minimal(base_size = 14) +
-  labs(title = "deviation of metric across ks",
-       subtitle = "caution vs mean(method,dataset,metric) value, not true k!",
+  labs(title = "Deviation of metric across ks",
+       subtitle = "Deviation vs value at true k",
        x = "k",
-       y = "perf metric deviation from group mean") +
+       y = "Perf metric deviation from true k") +
   scale_color_brewer(palette = "Set1")
 ```
 
@@ -368,4 +399,79 @@ ggplot(fd_seed_var, aes(x = metric_name, y = mean_sd_runs, fill = method)) +
        x = "Metric",
        y = "run-driven sd") +
   scale_fill_brewer(palette = "Set2")
+```
+
+Recap
+
+
+```{r, fig.width = 12}
+print(ggplot(fd_long, aes(x = backend, y = value, fill = backend)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  geom_jitter(width = 0.2, alpha = 0.1, size = 1) +
+  facet_wrap(~metric, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "comp perf by backend") +
+  scale_fill_brewer(palette = "Set2"))
+
+print(ggplot(fd_seed_summary,
+             aes(x = seed, y = mean_value,
+                 group = interaction(method, dataset_name, k),
+                 color = method)) +
+  geom_line(alpha = 0.5) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = mean_value - sd_runs,
+                    ymax = mean_value + sd_runs),
+                width = 0.2, alpha = 0.4) +
+  facet_wrap(~metric_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Seed sensitivity",
+       subtitle = "Error bars depict runs variability"))
+
+print(ggplot(fd, aes(x = cpu_time, y = metric_value,
+                     color = method, shape = backend)) +
+  geom_point(alpha = 0.6) +
+  facet_wrap(~metric_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "clustering metrics vs runtime trade‑offs",
+       x = "CPU time (s)",
+       y = "clusering metric value"))
+
+print(ggplot(fd, aes(x = max_rss, y = metric_value,
+                     color = method, shape = backend)) +
+  geom_point(alpha = 0.6) +
+  facet_wrap(~metric_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "clustering metrics vs RSS trade‑offs",
+       x = "max RSS (MB)",
+       y = "clustering metric value"))
+
+```
+
+Bland Altmans, any k vs the true k
+
+```{r, fig.width =10}
+fd_dev_true <- fd %>%
+  group_by(method, dataset_name, metric_name) %>%
+  # get the metric value at true_k
+  mutate(true_value = metric_value[k == true_k][1],
+         diff_val   = metric_value - true_value,
+         mean_val   = (metric_value + true_value)/2) %>%
+  ungroup()
+
+# Bland–Altman style plot: any k vs true_k
+ggplot(fd_dev_true, aes(x = mean_val, y = diff_val, color = method)) +
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE),
+             linetype = "dashed", color = "blue") +
+  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) + 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+             linetype = "dotted", color = "red") +
+  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) - 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+             linetype = "dotted", color = "red") +
+  facet_wrap(~metric_name, scales = "free") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Bland–Altman: any k vs true_k",
+       x = "Mean of k and true_k",
+       y = "Difference (k - true_k)")
+
+
 ```

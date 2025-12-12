@@ -16,10 +16,10 @@
 #   run_conda       run conda backend with seeds + repeats
 #   run_oras        run oras backend with seeds + repeats
 #   run_envs        run envmodules backend with seeds + repeats
-#   knit_report     generate RMarkdown reports - not fully tested
+#   knit_report     generate RMarkdown reports and an aggregated CSV - not fully tested
 #
 # Environment:
-# - MAX_CORES controls parallelism (default: 50).
+# - MAX_CORES controls num concurrent rules
 # - EASYBUILD_PREFIX needs to be tuned to access the envmodules built extending EESSI <--------------!!!!
 #    see: https://github.com/omnibenchmark/clustering_example/pull/43
 #
@@ -28,7 +28,7 @@
 
 MAX_CORES ?= 50
 
-# EasyBuild installation prefix (imallona; edit accordingly)
+# EasyBuild installation prefix (imallona; edit accordingly) ## <------------------------------------!!!!
 EASYBUILD_PREFIX ?= /data/imallona/.local/easybuild
 export EASYBUILD_PREFIX
 
@@ -38,7 +38,6 @@ OB_CMD = ob run benchmark --local-storage --cores ${MAX_CORES}
 # actual benchmark plan repository - to be pinned (the commit/tag)
 CLUSTERING_REPO   = https://github.com/omnibenchmark/clustering_example
 CLUSTERING_BRANCH = longer_yamls
-
 CLUSTERING_DIR	  = clustering_example
 
 # legacy reports in the wrong repository; to be moved to this one
@@ -115,7 +114,6 @@ run_envs: clone_yamls
 			rm $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
 		done \
 	'
-
 
 knit_report: clone_reports
 	# R -e 'rmarkdown::render("$(REPORTS_DIR)/07_metrics_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
