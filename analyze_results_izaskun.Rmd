@@ -1,9 +1,21 @@
 ---
-title: "clustbench figure 2"
+title: "clustbench exploratory / fig 2 making"
+author: "Izaskun Mallona"
 output:
-  html_document: default
-date: "`r Sys.Date()`"
+  html_document:
+    theme: readable
+    toc: true
+    toc_float: true
+    code_folding: hide
+    code_download: true
+    number_sections: true
+    df_print: default
+    highlight: tango
+    keep_md: true
+    self_contained: false
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
 ---
+
 
 ```{r setup, message = FALSE}
 library(knitr)
@@ -16,11 +28,12 @@ knitr::opts_chunk$set(
   echo    = TRUE,
   warning = TRUE,
   message = TRUE,
+  fig.width = 12,
+  fig.height = 12,
   fig.path = "plots/",
   dev = c("png", "svg"),
-  fig.width  = 10,
-  fig.height = 10)
-
+  cache.lazy = FALSE,
+  cache = TRUE)
 
 ```
 
@@ -173,7 +186,7 @@ print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
   scale_fill_brewer(palette = "Set2"))
 ```
 
-Clearly the method, so all good:
+Clearly the method, so all good. With segments following dataset/method/params.
 
 ```{r}
 print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
@@ -231,6 +244,38 @@ print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
 )
 ```
 
+**Let's make sure we don't plot methods/datasets/params when one of the backends is not evern recording performances because the run is so quick**:
+
+@todo check this and perhaps update others
+
+```{r, fig.width = 30, fig.height = 30}
+
+
+
+fd_complete <- fd %>%
+  filter(backend %in% c("conda","oras","envmodules")) %>%
+  group_by(method_full, dataset_name, seed, run, generator, k) %>%
+  # keep only groups that have all 3 backends and no NA cpu_time,
+    ## even if that means disregarding the superquick tasks that are not profiled by snmk
+  filter(n_distinct(backend) == 3, !any(is.na(cpu_time))) %>%
+  ungroup()
+
+print(ggplot(fd_complete, aes(x = backend, y = cpu_time)) +
+      geom_boxplot(outlier.alpha = 0.3) +
+      geom_point(alpha = 0.6,
+                 position = position_jitter(width = 0.15)) +
+      geom_line(
+          aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k)),
+          alpha = 0.1,
+          color = "grey40"
+      ) +
+      facet_wrap(~method_full, scales = "free_y") +
+      theme_minimal(base_size = 14) +
+      labs(title = "CPU time by backend (only complete groups)",
+           x = "Backend",
+           y = "CPU time (s)"))
+
+```
 
 ```{r}
 print(
@@ -250,19 +295,6 @@ print(
 )
 ```
 
-
-```{r, eval = FALSE}
-
-ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
-       aes(x = backend, y = metric_value, color = backend)) +
-  geom_boxplot(outlier.alpha = 0.3) +
-  facet_wrap(~metric_name, scales = "free_y") +
-  theme_minimal(base_size = 14) +
-  labs(title = "Metrics consistency across backends",
-       x = "Backend",
-       y = "Metric Value") +
-  scale_color_brewer(palette = "Set1")
-```
 
 
 
@@ -289,6 +321,10 @@ print(
   scale_color_brewer(palette = "Dark2"))
 
 ```
+
+
+
+
 
 
 ```{r}
@@ -342,7 +378,31 @@ ggplot(fd_long, aes(x = backend, y = value, fill = backend)) +
   scale_fill_brewer(palette = "Set2")
 ```
 
+Now the same but making sure only items that are measured across all backends (so no NAs because they're too quick and not profiled) are shown
 
+```{r, fig.width = 10, fig.height=10}
+
+fd_long_complete <- fd %>%
+  filter(backend %in% c("conda","oras","envmodules")) %>%
+  pivot_longer(cols = all_of(perf_metrics),
+               names_to = "metric",
+               values_to = "value") %>%
+  group_by(method_full, dataset_name, seed, run, generator, k, metric) %>%
+  filter(n_distinct(backend) == 3, !any(is.na(value))) %>%
+  ungroup()
+
+ggplot(fd_long_complete, aes(x = backend, y = value, fill = backend)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  geom_jitter(width = 0.2, alpha = 0.1, size = 1, color = "black") +
+  facet_wrap(~metric, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Perf metrics by backend (only complete groups)",
+       x = "backend",
+       y = "perf value") +
+  scale_fill_brewer(palette = "Set2")
+
+
+```
 
 
 Something wrong with method "1" etc here?
@@ -353,6 +413,8 @@ fd_long <- fd %>%
   pivot_longer(cols = all_of(perf_metrics),
                names_to = "metric",
                values_to = "value")
+
+table(fd_long$method, fd_long$method_full)
 
 ggplot(fd_long, aes(x = backend, y = value)) +
   # boxplots filled by backend
@@ -381,31 +443,6 @@ table(fd$method)
 ```
 
 Choice of `k` - we lack the annotation of the true k in the long CSV
-
-
-<!-- Just use deviations vs mean depending on the k. Ideally this should vs the true number of clusters! -->
-
-
-<!-- ```{r, fig.width = 7} -->
-<!-- fd_dev_k <- fd %>% -->
-<!--   group_by(method, dataset_name, metric_name) %>% -->
-<!--   mutate(mean_value = mean(metric_value, na.rm = TRUE), -->
-<!--          deviation_k = metric_value - mean_value) %>% -->
-<!--   ungroup() -->
-
-<!-- summary(fd_dev_k$deviation_k) -->
-
-
-<!-- ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method)) + -->
-<!--   geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) + -->
-<!--   facet_wrap(dataset_name~metric_name, scales = "free_y") + -->
-<!--   theme_minimal(base_size = 14) + -->
-<!--   labs(title = "deviation of metric across ks", -->
-<!--        subtitle = "caution vs mean(method,dataset,metric) value, not true k!", -->
-<!--        x = "k", -->
-<!--        y = "perf metric deviation from group mean") + -->
-<!--   scale_color_brewer(palette = "Set1") -->
-<!-- ``` -->
 
 ```{r}
 
@@ -567,3 +604,101 @@ ggplot(fd_dev_true, aes(x = mean_val, y = diff_val, color = dataset_name)) +
 
 ```
 
+More Bland Altmans
+
+```{r, fig.width = 50, fig.height = 30}
+ggplot(fd_dev_true,
+       aes(x = mean_val, y = diff_val, color = method_full)) +   # color by method_full
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE),
+             linetype = "dashed", color = "blue") +
+  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) + 
+                           1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+             linetype = "dotted", color = "red") +
+  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) - 
+                           1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+             linetype = "dotted", color = "red") +
+  facet_grid(metric_name ~ dataset_name, scales = "free") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Bland–Altman: any k vs true_k",
+       x = "Mean of k and true_k",
+       y = "Difference (k - true_k)")
+
+```
+
+ks again
+
+```{r, fig.width = 30, fig.height = 30}
+true_vals <- fd %>%
+  filter(k == true_k) %>%
+  select(method_full, dataset_name, metric_name, run, seed, true_value = metric_value)
+
+fd_dev_k <- fd %>%
+  group_by(method_full, dataset_name, metric_name, run, seed) %>%
+  mutate(true_value = first(metric_value[k == true_k]),
+         deviation_k = metric_value - true_value) %>%
+  ungroup()
+
+ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method_full)) +
+  geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) +
+  facet_grid(dataset_name ~ metric_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Deviation of metric across ks",
+       subtitle = "Deviation vs value at true k",
+       x = "k",
+       y = "Perf metric deviation from true k") +
+  scale_color_brewer(palette = "Set1")
+
+```
+
+seeds and runs again, only true k
+
+
+```{r}
+
+fd_true <- fd %>% filter(k == true_k)
+
+fd_dev_seed <- fd_true %>%
+  group_by(method_full, dataset_name, metric_name, run) %>%
+  mutate(
+    mean_true_val = mean(metric_value, na.rm = TRUE),
+    deviation_seed = metric_value - mean_true_val
+  ) %>%
+  ungroup()
+
+## floats strike again...
+tol <- sqrt(.Machine$double.eps)
+fd_dev_seed <- fd_dev_seed %>%
+  mutate(deviation_seed = ifelse(abs(deviation_seed) < tol, 0, deviation_seed))
+
+
+summary(fd_dev_seed)
+
+
+ggplot(fd_dev_seed, aes(x = factor(seed), y = deviation_seed, color = method_full)) +
+  geom_point(alpha = 0.6) +
+  theme_minimal(base_size = 14) +
+  labs(title = "Deviation at true k across seeds",
+       x = "Seed",
+       y = "Deviation from mean across seeds") +
+  scale_color_brewer(palette = "Set1")
+
+
+fd_dev_run <- fd_true %>%
+  group_by(method_full, dataset_name, metric_name, seed) %>%
+  mutate(
+    mean_true_val = mean(metric_value, na.rm = TRUE),
+    deviation_run = metric_value - mean_true_val
+  ) %>%
+  ungroup()
+
+tol <- sqrt(.Machine$double.eps)
+fd_dev_run <- fd_dev_run %>%
+  mutate(deviation_run = ifelse(abs(deviation_run) < tol, 0, deviation_run))
+
+summary(fd_dev_run)
+
+```
+
+
+Hmm, either I'm getting only deterministic methods or something in calcs is wrong, let's rerun with more methods
