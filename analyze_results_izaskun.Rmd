@@ -10,6 +10,7 @@ library(knitr)
 library(tidyverse)
 library(jsonlite)
 library(ggplot2)
+library(data.table)
 
 knitr::opts_chunk$set(
   echo    = TRUE,
@@ -17,38 +18,13 @@ knitr::opts_chunk$set(
   message = TRUE,
   fig.path = "plots/",
   dev = c("png", "svg"),
-  fig.width  = 6,
-  fig.height = 6)
+  fig.width  = 10,
+  fig.height = 10)
 
 
 ```
 
 ```{r}
-# flatten configurations into long rows of param_name/param_value
-flatten_configurations <- function(cfgs) {
-  if (is.null(cfgs) || length(cfgs) == 0) {
-    return(data.frame(parameter_dir = NA_character_,
-                      param_name    = NA_character_,
-                      param_value   = NA_character_,
-                      stringsAsFactors = FALSE))
-  }
-  out <- data.frame()
-  for (cfg in cfgs) {
-    parameter_dir <- cfg$parameter_dir
-    params <- cfg$parameters
-    if (is.data.frame(params)) params <- as.list(params)
-    flat <- unlist(params, use.names = TRUE)
-    for (p in names(flat)) {
-      out <- rbind(out, data.frame(
-        parameter_dir = parameter_dir,
-        param_name    = p,
-        param_value   = as.character(flat[[p]]),
-        stringsAsFactors = FALSE
-      ))
-    }
-  }
-  out
-}
 
 ## given the way we have them, so we aim to provide 5 ks, middle being the true, but pad with 2s on the left
 get_true_k <- function(x) {
@@ -64,65 +40,121 @@ get_true_k <- function(x) {
   }
 }
 
+
+`%||%` <- function(a, b) if (!is.null(a)) a else b
+
+flatten_parameters <- function(params, parameter_dir) {
+  if (is.null(params) || length(params) == 0) {
+    return(data.frame(parameter_dir = parameter_dir,
+                      param_name    = NA_character_,
+                      param_value   = NA_character_,
+                      stringsAsFactors = FALSE))
+  }
+  flat <- unlist(params, use.names = TRUE)
+  data.frame(
+    parameter_dir = parameter_dir,
+    param_name    = names(flat),
+    param_value   = as.character(flat),
+    stringsAsFactors = FALSE
+  )
+}
+
 flatten_record <- function(rec) {
-  pm   <- rec$metrics$partition_metrics
+  mets <- rec$metrics
   perf <- rec$performance
-  cfg_df <- flatten_configurations(rec$configurations)
+  params_df <- flatten_parameters(rec$parameters, rec$parameter_dir)
 
   rows <- list()
-  idx  <- 0
+  idx <- 0
 
-  for (metric_name in names(pm)) {
-    metric_vals <- pm[[metric_name]]
-    true_k <- get_true_k(names(metric_vals))
-    
-    for (k in names(metric_vals)) {
-      for (i in seq_len(nrow(cfg_df))) {
-        idx <- idx + 1
-        rows[[idx]] <- data.frame(
-          backend      = rec$backend,
-          seed         = rec$seed,
-          run          = rec$run,
-          generator    = rec$generator,
-          dataset_name = rec$dataset_name,
-          method       = rec$method,
-          path         = rec$path,
-          method_params= rec$method_params,
-          method_full  = rec$method_full,
-          parameter_dir= cfg_df$parameter_dir[i],
-          param_name   = cfg_df$param_name[i],
-          param_value  = cfg_df$param_value[i],
-          k            = as.integer(k),
-          true_k       = as.integer(true_k),
-          metric_name  = metric_name,
-          metric_value = metric_vals[[k]],
-          # performance metrics
-          s        = perf$s,
-          h_m_s    = perf[["h:m:s"]],
-          max_rss  = perf$max_rss,
-          max_vms  = perf$max_vms,
-          max_uss  = perf$max_uss,
-          max_pss  = perf$max_pss,
-          io_in    = perf$io_in,
-          io_out   = perf$io_out,
-          mean_load= perf$mean_load,
-          cpu_time = perf$cpu_time,
-          stringsAsFactors = FALSE
-        )
+  for (family in names(mets)) {
+    fam_list <- mets[[family]]
+    if (is.null(fam_list)) next
+
+    for (metric_name in names(fam_list)) {
+      metric_vals <- fam_list[[metric_name]]
+      if (is.null(metric_vals)) next
+
+      ks <- names(metric_vals)
+      true_k <- get_true_k(ks)
+
+      for (k in ks) {
+        for (i in seq_len(nrow(params_df))) {
+          idx <- idx + 1
+          rows[[idx]] <- data.frame(
+            backend       = rec$backend,
+            seed          = rec$seed,
+            run           = rec$run,
+            generator     = rec$generator,
+            dataset_name  = rec$dataset_name,
+            method        = rec$method,          # keep "sklearn"
+            method_full   = rec$method_full,     # "sklearn_method-birch" or "sklearn_method-kmeans"
+            parameter_dir = rec$parameter_dir,   # "method-birch" or "method-kmeans"
+            param_name    = params_df$param_name[i],
+            param_value   = params_df$param_value[i],
+            metric_family = family,
+            metric_name   = metric_name,
+            k             = as.integer(k),
+            true_k        = as.integer(true_k),
+            metric_value  = metric_vals[[k]],
+            s             = perf$s,
+            h_m_s         = perf[["h:m:s"]],
+            max_rss       = perf$max_rss,
+            max_vms       = perf$max_vms,
+            max_uss       = perf$max_uss,
+            max_pss       = perf$max_pss,
+            io_in         = perf$io_in,
+            io_out        = perf$io_out,
+            mean_load     = perf$mean_load,
+            cpu_time      = perf$cpu_time,
+            stringsAsFactors = FALSE
+          )
+        }
       }
     }
   }
+
   do.call(rbind, rows)
 }
 
-records <- jsonlite::fromJSON('aggregated_results.json', simplifyVector = FALSE)
 
-fd <- do.call(rbind, lapply(records, flatten_record))
-
-head(fd)
+```
 
 
-table(fd$param_name)
+```{r}
+
+records <- fromJSON("aggregated_results.json", simplifyVector = FALSE)
+
+# 
+fd_list <- vector("list", length(records))
+for (i in seq_along(records)) {
+  if (i == 1 || i == 2 || i %% 250 == 0)
+      cat("Processing record", i, "of", length(records), "\n")
+  fd_list[[i]] <- flatten_record(records[[i]])
+}
+fd <- data.table::rbindlist(fd_list, use.names = TRUE, fill = TRUE)
+
+dim(fd)
+
+str(fd)
+table(is.na(fd$max_rss))
+table(fd$method_full)
+table(vapply(records, function(x) x$method_full, character(1)))
+
+fd <- as.data.frame(fd)
+
+fd$k <- as.integer(fd$k)
+fd$true_k <- as.integer(fd$true_k)
+
+cols_to_num <- c("max_rss","max_vms","max_uss","max_pss",
+                 "io_in","io_out","mean_load","cpu_time")
+
+fd[cols_to_num] <- lapply(fd[cols_to_num], function(x) {
+  x[x == "NA"] <- NA_character_
+  as.numeric(x)
+})
+
+
 write.csv(fd, file = 'aggregated_results.csv')
 
 ```
@@ -139,7 +171,7 @@ print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
        x = "Backend",
        y = "CPU Time (s)") +
   scale_fill_brewer(palette = "Set2"))
-```
+ ```
 
 Clearly the method, so all good:
 
@@ -150,7 +182,7 @@ print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
   # add points for each method/params combination
   geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) +
   # connect points across backends for same module+params
-  geom_line(aes(group = interaction(method, method_params, seed, run, generator, dataset_name, k)),
+  geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k)),
             alpha = 0.1, color = "grey40") +
   facet_wrap(~metric_name, scales = "free_y") +
   theme_minimal(base_size = 14) +
@@ -165,19 +197,56 @@ print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
 
 ```{r}
 print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
-       aes(x = backend, y = cpu_time, fill = backend)) +
+       aes(x = backend, y = cpu_time)) +
   geom_boxplot(outlier.alpha = 0.3) +
   # add points for each method/params combination
   geom_point(aes(color = method),
              alpha = 0.6, position = position_jitter(width = 0.15)) +
   # connect points across backends for same module+params
-  geom_line(aes(group = interaction(method, method_params, seed, run, generator, dataset_name, k)),
+  geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k)),
             alpha = 0.1, color = "grey40") +
   theme_minimal(base_size = 14) +
   labs(title = "CPU time by backend",
        x = "Backend",
        y = "CPU time (s)") +
   scale_color_brewer(palette = "Set1")
+)
+```
+
+```{r}
+print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
+       aes(x = backend, y = cpu_time)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  # add points for each method/params combination
+  geom_point(aes(color = method_full),
+             alpha = 0.6, position = position_jitter(width = 0.15)) +
+  # connect points across backends for same module+params
+  geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k)),
+            alpha = 0.1, color = "grey40") +
+  theme_minimal(base_size = 14) +
+  labs(title = "CPU time by backend",
+       x = "Backend",
+       y = "CPU time (s)") +
+  scale_color_brewer(palette = "Set1")
+)
+```
+
+
+```{r}
+print(
+  ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
+         aes(x = backend, y = cpu_time)) +
+    geom_boxplot(outlier.alpha = 0.3) +
+    geom_point(aes(color = method_full),
+               alpha = 0.6, position = position_jitter(width = 0.15)) +
+    geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k)),
+              alpha = 0.1, color = "grey40") +
+    theme_minimal(base_size = 14) +
+    facet_wrap(~method, scales = "free_y") + 
+    labs(title = "CPU time by backend",
+         x = "Backend",
+         y = "CPU time (s)") +
+    scale_color_brewer(palette = "Set1")
 )
 ```
 
@@ -197,7 +266,7 @@ ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
 
 
 
-```{r}
+```{r, fig.width = 20, fig.height = 20}
 
 print(
   ggplot(fd, aes(x = backend, y = metric_value)) +
@@ -208,7 +277,7 @@ print(
              alpha = 0.6,
              position = position_jitter(width = 0.15)) +
   # connect points across backends for same method/params/run/etc.
-  geom_line(aes(group = interaction(method, method_params, seed, run, generator, dataset_name, k),
+  geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k),
                 color = run),
             alpha = 0.2) +
   facet_wrap(dataset_name ~ metric_name, scales = "free_y") +
@@ -234,7 +303,6 @@ wide_run <- fd %>%
   summarise(metric_value = mean(as.numeric(metric_value), na.rm = TRUE), .groups = "drop") %>%
   pivot_wider(names_from = backend, values_from = metric_value)
 
-# Check structure
 str(wide_run)
 
 cors_run <- wide_run %>%
@@ -261,6 +329,23 @@ fd_long <- fd %>%
                names_to = "metric",
                values_to = "value")
 
+# Bland–Altman style plot: any k vs true_k
+ggplot(fd_dev_true, aes(x = mean_val, y = diff_val, color = method)) +
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE),
+             linetype = "dashed", color = "blue") +
+  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) + 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+             linetype = "dotted", color = "red") +
+  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) - 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+             linetype = "dotted", color = "red") +
+  facet_wrap(~metric_name, scales = "free") +
+  theme_minimal(base_size = 14) +
+  labs(title = "Bland–Altman: any k vs true_k",
+       x = "Mean of k and true_k",
+       y = "Difference (k - true_k)")
+
+
+```
 #  boxplots + jittered scatter, faceted by metric
 ggplot(fd_long, aes(x = backend, y = value, fill = backend)) +
   geom_boxplot(outlier.alpha = 0.3) +
@@ -273,8 +358,6 @@ ggplot(fd_long, aes(x = backend, y = value, fill = backend)) +
   scale_fill_brewer(palette = "Set2")
 
 ```
-
-Something wrong with method "1" etc here?
 
 
 ```{r, fig.width = 10, fig.height = 10}
@@ -291,7 +374,7 @@ ggplot(fd_long, aes(x = backend, y = value)) +
              alpha = 0.6,
              position = position_jitter(width = 0.15)) +
   # connect points across backends for same method/run/etc.
-  geom_line(aes(group = interaction(method, method_params, seed, run, generator, dataset_name, k),
+  geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k),
                 color = run),
             alpha = 0.1) +
   facet_wrap(~metric, scales = "free_y") +
@@ -306,46 +389,23 @@ ggplot(fd_long, aes(x = backend, y = value)) +
 
 ```{r}
 
-table(fd$method)
+table(fd$method, fd$method_full)
 ```
 
-Choice of `k` - we lack the annotation of the true k in the long CSV
+Choice of `k` impact in clusering perf metrics. Conda only, to speedup.
 
-
-<!-- Just use deviations vs mean depending on the k. Ideally this should vs the true number of clusters! -->
-
-
-<!-- ```{r, fig.width = 7} -->
-<!-- fd_dev_k <- fd %>% -->
-<!--   group_by(method, dataset_name, metric_name) %>% -->
-<!--   mutate(mean_value = mean(metric_value, na.rm = TRUE), -->
-<!--          deviation_k = metric_value - mean_value) %>% -->
-<!--   ungroup() -->
-
-<!-- summary(fd_dev_k$deviation_k) -->
-
-
-<!-- ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method)) + -->
-<!--   geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) + -->
-<!--   facet_wrap(dataset_name~metric_name, scales = "free_y") + -->
-<!--   theme_minimal(base_size = 14) + -->
-<!--   labs(title = "deviation of metric across ks", -->
-<!--        subtitle = "caution vs mean(method,dataset,metric) value, not true k!", -->
-<!--        x = "k", -->
-<!--        y = "perf metric deviation from group mean") + -->
-<!--   scale_color_brewer(palette = "Set1") -->
-<!-- ``` -->
-
-```{r}
+```{r, fig.width = 20, fig.height = 20}
 
 fd_dev_k <- fd %>%
-  group_by(method, dataset_name, metric_name) %>%
+    filter(backend == 'conda') %>%
+  group_by(method_full, dataset_name, metric_name) %>%
   # get the metric_value at the true_k for this group
-  mutate(true_value = metric_value[k == true_k][1],
-         deviation_k = metric_value - true_value) %>%
+  mutate(perf_at_true_value = metric_value[k == true_k][1],
+         deviation_k = metric_value - perf_at_true_value) %>%
   ungroup()
 
 summary(fd_dev_k$deviation_k)
+str(fd_dev_k)
 
 ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method)) +
   geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) +
@@ -360,17 +420,18 @@ ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method)) +
 
 What about the consistency across runs and seeds? e.g., do different seeds produce different results?
 
-First, seeds
+First, seeds. Again conda only.
 
 ```{r}
 fd_seed_summary <- fd %>%
-  group_by(method, dataset_name, metric_name, k, seed) %>%
+        filter(backend == 'conda') %>%
+  group_by(method_full, dataset_name, metric_name, k, seed) %>%
   summarise(mean_value = mean(metric_value, na.rm = TRUE),   # average across runs
             sd_runs    = sd(metric_value, na.rm = TRUE),   # replicate consistency
             .groups = "drop")
 
 fd_seed_var <- fd_seed_summary %>%
-  group_by(method, dataset_name, metric_name, k) %>%
+  group_by(method_full, dataset_name, metric_name, k) %>%
   summarise(sd_seeds = sd(mean_value, na.rm = TRUE),      # variability across seeds
             mean_sd_runs = mean(sd_runs, na.rm = TRUE),      # replicate consistency
             .groups = "drop")
@@ -379,7 +440,7 @@ fd_seed_var <- fd_seed_summary %>%
 summary(fd_seed_var)
 
 
-ggplot(fd_seed_var, aes(x = metric_name, y = sd_seeds, fill = method)) +
+ggplot(fd_seed_var, aes(x = metric_name, y = sd_seeds, fill = method_full)) +
   geom_boxplot(outlier.alpha = 0.3) +
   theme_minimal(base_size = 14) +
   labs(title = "seed sensitivity across methods",
@@ -392,7 +453,7 @@ ggplot(fd_seed_var, aes(x = metric_name, y = sd_seeds, fill = method)) +
 Second, runs
 
 ```{r}
-ggplot(fd_seed_var, aes(x = metric_name, y = mean_sd_runs, fill = method)) +
+ggplot(fd_seed_var, aes(x = metric_name, y = mean_sd_runs, fill = method_full)) +
   geom_boxplot(outlier.alpha = 0.3) +
   theme_minimal(base_size = 14) +
   labs(title = "repeated run sensitivity across methods",
@@ -412,11 +473,14 @@ print(ggplot(fd_long, aes(x = backend, y = value, fill = backend)) +
   theme_minimal(base_size = 14) +
   labs(title = "comp perf by backend") +
   scale_fill_brewer(palette = "Set2"))
+```
 
+
+```{r,  fig.width = 20, fig.height = 20}
 print(ggplot(fd_seed_summary,
              aes(x = seed, y = mean_value,
-                 group = interaction(method, dataset_name, k),
-                 color = method)) +
+                 group = interaction(method_full, dataset_name, k),
+                 color = method_full)) +
   geom_line(alpha = 0.5) +
   geom_point(size = 2) +
   geom_errorbar(aes(ymin = mean_value - sd_runs,
@@ -426,9 +490,11 @@ print(ggplot(fd_seed_summary,
   theme_minimal(base_size = 14) +
   labs(title = "Seed sensitivity",
        subtitle = "Error bars depict runs variability"))
+```
 
+```{r, fig.width = 12}
 print(ggplot(fd, aes(x = cpu_time, y = metric_value,
-                     color = method, shape = backend)) +
+                     color = method_full, shape = backend)) +
   geom_point(alpha = 0.6) +
   facet_wrap(~metric_name, scales = "free_y") +
   theme_minimal(base_size = 14) +
@@ -437,7 +503,7 @@ print(ggplot(fd, aes(x = cpu_time, y = metric_value,
        y = "clusering metric value"))
 
 print(ggplot(fd, aes(x = max_rss, y = metric_value,
-                     color = method, shape = backend)) +
+                     color = method_full, shape = backend)) +
   geom_point(alpha = 0.6) +
   facet_wrap(~metric_name, scales = "free_y") +
   theme_minimal(base_size = 14) +
@@ -451,27 +517,10 @@ Bland Altmans, any k vs the true k
 
 ```{r, fig.width =10}
 fd_dev_true <- fd %>%
-  group_by(method, dataset_name, metric_name) %>%
+  group_by(method_full, dataset_name, metric_name) %>%
   # get the metric value at true_k
   mutate(true_value = metric_value[k == true_k][1],
          diff_val   = metric_value - true_value,
          mean_val   = (metric_value + true_value)/2) %>%
   ungroup()
 
-# Bland–Altman style plot: any k vs true_k
-ggplot(fd_dev_true, aes(x = mean_val, y = diff_val, color = method)) +
-  geom_point(alpha = 0.6) +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE),
-             linetype = "dashed", color = "blue") +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) + 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
-             linetype = "dotted", color = "red") +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) - 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
-             linetype = "dotted", color = "red") +
-  facet_wrap(~metric_name, scales = "free") +
-  theme_minimal(base_size = 14) +
-  labs(title = "Bland–Altman: any k vs true_k",
-       x = "Mean of k and true_k",
-       y = "Difference (k - true_k)")
-
-
-```
