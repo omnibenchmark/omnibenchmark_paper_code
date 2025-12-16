@@ -26,18 +26,18 @@
 # ============================================================
 
 
-MAX_CORES ?= 50
+MAX_CORES ?= 120
 
 # EasyBuild installation prefix (imallona; edit accordingly) ## <------------------------------------!!!!
 EASYBUILD_PREFIX ?= /data/imallona/.local/easybuild
 export EASYBUILD_PREFIX
 
 # omnibenchmark command template
-OB_CMD = ob run benchmark --local-storage --cores ${MAX_CORES}
+OB_CMD = ob run benchmark --cores ${MAX_CORES} -k --task-timeout 1min --yes
 
 # actual benchmark plan repository - to be pinned (the commit/tag)
 CLUSTERING_REPO   = https://github.com/omnibenchmark/clustering_example
-CLUSTERING_BRANCH = longer_yamls
+CLUSTERING_BRANCH = full_yamls
 CLUSTERING_DIR	  = clustering_example
 
 # legacy reports in the wrong repository; to be moved to this one
