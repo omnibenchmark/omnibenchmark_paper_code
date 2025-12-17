@@ -167,7 +167,7 @@ fd[cols_to_num] <- lapply(fd[cols_to_num], function(x) {
 })
 
 fd$k_offset <- fd$k - fd$true_k
-write.csv(fd, file = 'aggregated_results.csv')
+## write.csv(fd, file = 'aggregated_results.csv') ## later, this needs extra cleaning
 
 ```
 
@@ -257,9 +257,36 @@ stopifnot(range(fd$k_offset) == c(-2, 2))
 Are seeds ok? why is `fcps_method-FCPS_MinEnergy_seed-2` a method name, which seed is that? **looks wrong**
 
 ```{r}
+
 table(fd$method_full, fd$seed)
+table(fd$method, fd$seed)
 ```
 
+Are we stupidly running some methods more times with different seeds, even if they don't use seeds at all? then remove them
+
+```{r}
+head(fd)
+table(fd$method_full)
+
+
+## flag methods that explicitly encode a seed.
+## filter(has_seed | seed == 1),  keep all rows for seed‑encoded methods, but only seed==1 otherwise
+fd_clean <- fd %>%
+  mutate(has_seed = grepl("seed-", method_full),
+         seed     = ifelse(has_seed, as.character(seed), "none")) %>%
+  filter(has_seed | seed == "none")
+
+dim(fd_clean)
+dim(fd)
+table(fd$seed, useNA = 'always')
+table(fd_clean$seed, useNA = 'always')
+
+fd <- fd_clean
+
+rm(fd_clean)
+
+write.csv(fd, file = 'aggregated_results.csv')
+```
 
 
 
