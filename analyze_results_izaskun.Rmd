@@ -345,31 +345,31 @@ ggplot(fd_avg, aes(x = backend, y = imputed_cpu_time)) +
 
 # Results consistency across backends
 
-## Unreadable perf metrics plot
+<!-- ## Unreadable perf metrics plot -->
 
-```{r, fig.width = 30, fig.height = 30}
+<!-- ```{r, fig.width = 30, fig.height = 30} -->
 
-print(
-  ggplot(fd, aes(x = backend, y = metric_value)) +
-  # boxplots still colored by backend
-  geom_boxplot(aes(fill = backend), outlier.alpha = 0.3) +
-  # points colored by run
-  geom_point(aes(color = run),
-             alpha = 0.6,
-             position = position_jitter(width = 0.15)) +
-  # connect points across backends for same method/params/run/etc.
-  geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k),
-                color = run),
-            alpha = 0.2) +
-  facet_wrap(dataset_name ~ metric_name, scales = "free_y") +
-  theme_minimal(base_size = 14) +
-  labs(title = "Metrics consistency across backends (stage = methods)",
-       x = "Backend",
-       y = "Metric Value") +
-  scale_fill_brewer(palette = "Set1") +
-  scale_color_brewer(palette = "Dark2"))
+<!-- print( -->
+<!--   ggplot(fd, aes(x = backend, y = metric_value)) + -->
+<!--   # boxplots still colored by backend -->
+<!--   geom_boxplot(aes(fill = backend), outlier.alpha = 0.3) + -->
+<!--   # points colored by run -->
+<!--   geom_point(aes(color = run), -->
+<!--              alpha = 0.6, -->
+<!--              position = position_jitter(width = 0.15)) + -->
+<!--   # connect points across backends for same method/params/run/etc. -->
+<!--   geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k), -->
+<!--                 color = run), -->
+<!--             alpha = 0.2) + -->
+<!--   facet_wrap(dataset_name ~ metric_name, scales = "free_y") + -->
+<!--   theme_minimal(base_size = 14) + -->
+<!--   labs(title = "Metrics consistency across backends (stage = methods)", -->
+<!--        x = "Backend", -->
+<!--        y = "Metric Value") + -->
+<!--   scale_fill_brewer(palette = "Set1") + -->
+<!--   scale_color_brewer(palette = "Dark2")) -->
 
-```
+<!-- ``` -->
 
 # Pairwise correlations
 
@@ -404,7 +404,7 @@ print(cors_run)
 ```{r, fig.width = 10, fig.height=10}
 
 perf_metrics <- c("cpu_time","max_rss","max_vms","max_uss",
-                  "max_pss","io_in","io_out","mean_load")
+                  "max_pss","io_in","io_out","mean_load", "imputed_cpu_time")
 
 fd_long <- fd %>%
   filter(backend %in% c("conda","oras","envmodules")) %>%
@@ -412,9 +412,15 @@ fd_long <- fd %>%
                names_to = "metric",
                values_to = "value")
 
+## again, averaging repeated runs with the same seed
+fd_avg <- fd_long %>%
+  group_by(backend, seed, run, metric, dataset_name, method_full) %>%
+  summarise(mean_value = mean(value, na.rm = TRUE), .groups = "drop")
 
+head(fd_avg)
+                                                                         
 #  boxplots + jittered scatter, faceted by metric
-ggplot(fd_long, aes(x = backend, y = value, fill = backend)) +
+ggplot(fd_avg, aes(x = backend, y = mean_value, fill = backend)) +
   geom_boxplot(outlier.alpha = 0.3) +
   geom_jitter(width = 0.2, alpha = 0.1, size = 1, color = "black") +
   facet_wrap(~metric, scales = "free_y") +
@@ -440,7 +446,11 @@ fd_long_complete <- fd %>%
   filter(n_distinct(backend) == 3, !any(is.na(value))) %>%
   ungroup()
 
-ggplot(fd_long_complete, aes(x = backend, y = value, fill = backend)) +
+fd_avg <- fd_long_complete %>%
+  group_by(backend, seed, run, metric, dataset_name, method_full) %>%
+  summarise(mean_value = mean(value, na.rm = TRUE), .groups = "drop")
+
+ggplot(fd_avg, aes(x = backend, y = mean_value, fill = backend)) +
   geom_boxplot(outlier.alpha = 0.3) +
   geom_jitter(width = 0.2, alpha = 0.1, size = 1, color = "black") +
   facet_wrap(~metric, scales = "free_y") +
@@ -449,8 +459,6 @@ ggplot(fd_long_complete, aes(x = backend, y = value, fill = backend)) +
        x = "backend",
        y = "perf value") +
   scale_fill_brewer(palette = "Set2")
-
-
 ```
 
 ## Non-complete observations colored by method provider, with a bug
@@ -464,17 +472,22 @@ fd_long <- fd %>%
                names_to = "metric",
                values_to = "value")
 
-## table(fd_long$method, fd_long$method_full)
+fd_avg <- fd_long %>%
+  group_by(backend, seed, run, metric, dataset_name, method_full) %>%
+  summarise(mean_value = mean(value, na.rm = TRUE), .groups = "drop")
 
-ggplot(fd_long, aes(x = backend, y = value)) +
+head(fd_avg)
+table(fd_avg$seed, fd_avg$run)
+
+ggplot(fd_avg, aes(x = backend, y = mean_value)) +
   # boxplots filled by backend
   ## geom_boxplot(aes(fill = backend), outlier.alpha = 0.3) +
   # points colored by method
-  geom_point(aes(color = method),
+  geom_point(aes(color = method_full),
              alpha = 0.6,
              position = position_jitter(width = 0.15)) +
   # connect points across backends for same method/run/etc.
-  geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k),
+  geom_line(aes(group = interaction(method_full, seed, run, dataset_name),
                 color = run),
             alpha = 0.1) +
   facet_wrap(~metric, scales = "free_y") +
@@ -503,6 +516,7 @@ fd_dev_k <- fd %>%
   ungroup()
 
 summary(fd_dev_k$deviation_k)
+
 ## str(fd_dev_k)
 ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method_full)) +
   geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) +
@@ -515,12 +529,85 @@ ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method_full)) +
   scale_color_brewer(palette = "Set1")
 ```
 
+## By k offset
+
+
+```{r}
+## str(fd)
+fd_dev_k <- fd %>%
+  group_by(method_full, dataset_name, metric_name) %>%
+  # get the metric_value at the true_k for this group
+  mutate(true_value  = metric_value[k == true_k][1],
+         deviation_k = metric_value - true_value) %>%
+  ungroup()
+
+## again aggregate across repeated runs  - not seeds, given the method_full has them in its values
+fd_dev_k_avg <- fd_dev_k %>%
+  group_by(method_full, dataset_name, metric_name, k, k_offset) %>%
+  summarise(
+    mean_deviation_k = mean(deviation_k, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+head(fd_dev_k_avg)
+
+ggplot(fd_dev_k_avg, aes(x = k_offset, y = mean_deviation_k, color = method_full)) +
+  geom_point(alpha = 0.6, position = position_jitter(width = 0.15, height = 0)) +
+  facet_wrap(~ metric_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title  = "Performance impact of k offsets",
+       subtitle = "Deviation vs value at true k",
+       x = "Offset from true k",
+       y = "Perf metric deviation from true k") +
+  scale_color_brewer(palette = "Set1")
+
+ggplot(fd_dev_k_avg, aes(x = k_offset, y = mean_deviation_k, color = dataset_name)) +
+  geom_point(alpha = 0.6, position = position_jitter(width = 0.15, height = 0)) +
+  facet_wrap(~ metric_name, scales = "free_y") +
+  theme_minimal(base_size = 14) +
+  labs(title  = "Performance impact of k offsets",
+       x = "Offset from true k",
+       y = "Perf metric deviation from true k") +
+  scale_color_brewer(palette = "Set1")
+
+```
+
+adj Rand index only
+
+```{r}
+# ilter to adjusted_rand_score only
+fd_dev_k_ars <- fd_dev_k_avg %>%
+  filter(metric_name == "adjusted_rand_score")
+
+# by method_full
+ggplot(fd_dev_k_ars, aes(x = k_offset, y = mean_deviation_k, color = method_full)) +
+  geom_point(alpha = 0.6, position = position_jitter(width = 0.15, height = 0)) +
+  theme_minimal(base_size = 14) +
+  labs(title    = "Performance impact of k offsets",
+       subtitle = "Deviation vs value at true k",
+       x        = "Offset from true k",
+       y        = "Deviation in adjusted_rand_score") +
+  scale_color_brewer(palette = "Set1")
+
+#  by dataset_name
+ggplot(fd_dev_k_ars, aes(x = k_offset, y = mean_deviation_k, color = dataset_name)) +
+  geom_point(alpha = 0.6, position = position_jitter(width = 0.15, height = 0)) +
+  theme_minimal(base_size = 14) +
+  labs(title    = "Performance impact of k offsets",
+       x  = "Offset from true k",
+       y   = "Deviation in adjusted_rand_score") +
+  scale_color_brewer(palette = "Set1")
+
+```
+
 # Impact of seeds and repeated runs
 
 
 What about the consistency across runs and seeds? e.g., do different seeds produce different results?
 
 Only at true k.
+
+Double check this is correct...
 
 
 
@@ -545,12 +632,12 @@ fd_dev_seed <- fd_dev_seed %>%
 summary(fd_dev_seed)
 
 
-ggplot(fd_dev_seed, aes(x = factor(seed), y = deviation_seed, color = method_full)) +
-  geom_point(alpha = 0.6) +
-  theme_minimal(base_size = 14) +
-  labs(title = "Deviation at true k across seeds",
-       x = "Seed",
-       y = "Deviation from mean across seeds")
+## ggplot(fd_dev_seed, aes(x = factor(seed), y = deviation_seed, color = method_full)) +
+##   geom_point(alpha = 0.6) +
+##   theme_minimal(base_size = 14) +
+##   labs(title = "Deviation at true k across seeds",
+##        x = "Seed",
+##        y = "Deviation from mean across seeds")
 
 
 fd_dev_run <- fd_true %>%
@@ -573,45 +660,59 @@ summary(fd_dev_run)
 
 
 ```{r, fig.width = 12}
-## print(ggplot(fd_long, aes(x = backend, y = value, fill = backend)) +
-##   geom_boxplot(outlier.alpha = 0.3) +
-##   geom_jitter(width = 0.2, alpha = 0.1, size = 1) +
-##   facet_wrap(~metric, scales = "free_y") +
-##   theme_minimal(base_size = 14) +
-##   labs(title = "comp perf by backend") +
-##   scale_fill_brewer(palette = "Set2"))
 
-## print(ggplot(fd_seed_summary,
-##              aes(x = seed, y = mean_value,
-##                  group = interaction(method_full, dataset_name, k),
-##                  color = method_full)) +
-##   geom_line(alpha = 0.5) +
-##   geom_point(size = 2) +
-##   geom_errorbar(aes(ymin = mean_value - sd_runs,
-##                     ymax = mean_value + sd_runs),
-##                 width = 0.2, alpha = 0.4) +
+## print(ggplot(fd, aes(x = cpu_time, y = metric_value,
+##                      color = method_full, shape = backend)) +
+##   geom_point(alpha = 0.6) +
 ##   facet_wrap(~metric_name, scales = "free_y") +
 ##   theme_minimal(base_size = 14) +
-##   labs(title = "Seed sensitivity",
-##        subtitle = "Error bars depict runs variability"))
+##   labs(title = "clustering metrics vs runtime trade‑offs",
+##        x = "CPU time (s)",
+##        y = "clustering metric value"))
 
-print(ggplot(fd, aes(x = cpu_time, y = metric_value,
-                     color = method_full, shape = backend)) +
-  geom_point(alpha = 0.6) +
-  facet_wrap(~metric_name, scales = "free_y") +
-  theme_minimal(base_size = 14) +
-  labs(title = "clustering metrics vs runtime trade‑offs",
-       x = "CPU time (s)",
-       y = "clustering metric value"))
+## print(ggplot(fd, aes(x = max_rss, y = metric_value,
+##                      color = method_full, shape = backend)) +
+##   geom_point(alpha = 0.6) +
+##   facet_wrap(~metric_name, scales = "free_y") +
+##   theme_minimal(base_size = 14) +
+##   labs(title = "clustering metrics vs RSS trade‑offs",
+##        x = "max RSS (MB)",
+##        y = "clustering metric value"))
 
-print(ggplot(fd, aes(x = max_rss, y = metric_value,
+
+# aggregate across runs and ks again...
+fd_avg <- fd %>%
+  group_by(method_full, backend, dataset_name, metric_name) %>%
+  summarise(
+    mean_imputed_cpu_time = mean(imputed_cpu_time, na.rm = TRUE),
+    mean_max_rss  = mean(max_rss, na.rm = TRUE),
+    mean_metric   = mean(metric_value, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# imputed cpu time vs metric
+print(
+  ggplot(fd_avg, aes(x = mean_imputed_cpu_time, y = mean_metric,
                      color = method_full, shape = backend)) +
-  geom_point(alpha = 0.6) +
-  facet_wrap(~metric_name, scales = "free_y") +
-  theme_minimal(base_size = 14) +
-  labs(title = "clustering metrics vs RSS trade‑offs",
-       x = "max RSS (MB)",
-       y = "clustering metric value"))
+    geom_point(alpha = 0.6) +
+    facet_wrap(~metric_name, scales = "free_y") +
+    theme_minimal(base_size = 14) +
+    labs(title = "Clustering metrics vs runtime trade‑offs",
+         x = "Mean CPU time (s)",
+         y = "Mean clustering metric value")
+)
+
+# RSS vs metric, caution here no imputation / no idea how to handle memory for censored cpu_time data
+print(
+  ggplot(fd_avg, aes(x = mean_max_rss, y = mean_metric,
+                     color = method_full, shape = backend)) +
+    geom_point(alpha = 0.6) +
+    facet_wrap(~metric_name, scales = "free_y") +
+    theme_minimal(base_size = 14) +
+    labs(title = "Clustering metrics vs RSS trade‑offs",
+         x = "Mean max RSS (MB)",
+         y = "Mean clustering metric value")
+)
 
 ```
 
@@ -630,88 +731,139 @@ fd_dev_true <- fd %>%
          mean_val   = (metric_value + true_value)/2) %>%
   ungroup()
 
-# Bland–Altman style plot: any k vs true_k
-ggplot(fd_dev_true, aes(x = mean_val, y = diff_val, color = method_full)) +
+## # Bland–Altman style plot: any k vs true_k
+## ggplot(fd_dev_true, aes(x = mean_val, y = diff_val, color = method_full)) +
+##   geom_point(alpha = 0.6) +
+##   geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE),
+##              linetype = "dashed", color = "blue") +
+##   geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) + 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+##              linetype = "dotted", color = "red") +
+##   geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) - 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+##              linetype = "dotted", color = "red") +
+##   facet_wrap(~metric_name, scales = "free") +
+##   theme_minimal(base_size = 14) +
+##   labs(title = "Bland–Altman: any k vs true_k",
+##        x = "Mean of k and true_k",
+##        y = "Difference (k - true_k)")
+
+# collapse across seeds and runs
+fd_dev_true_avg <- fd_dev_true %>%
+  group_by(method_full, dataset_name, metric_name, k, k_offset) %>%
+  summarise(
+    mean_diff_val = mean(diff_val, na.rm = TRUE),
+    mean_mean_val = mean(mean_val, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(fd_dev_true_avg, aes(x = mean_mean_val, y = mean_diff_val, color = method_full)) +
   geom_point(alpha = 0.6) +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE),
+  geom_hline(yintercept = mean(fd_dev_true_avg$mean_diff_val, na.rm = TRUE),
              linetype = "dashed", color = "blue") +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) + 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+  geom_hline(yintercept = mean(fd_dev_true_avg$mean_diff_val, na.rm = TRUE) + 1.96*sd(fd_dev_true_avg$mean_diff_val, na.rm = TRUE),
              linetype = "dotted", color = "red") +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) - 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+  geom_hline(yintercept = mean(fd_dev_true_avg$mean_diff_val, na.rm = TRUE) - 1.96*sd(fd_dev_true_avg$mean_diff_val, na.rm = TRUE),
              linetype = "dotted", color = "red") +
   facet_wrap(~metric_name, scales = "free") +
   theme_minimal(base_size = 14) +
-  labs(title = "Bland–Altman: any k vs true_k",
-       x = "Mean of k and true_k",
-       y = "Difference (k - true_k)")
+  labs(title = "Bland–Altman: any k vs true_k (averaged)",
+       x = "Mean of k and true_k (averaged)",
+       y = "Difference (k - true_k, averaged)")
+
+
 ```
 
 ## Colored by dataset
 
 ```{r, fig.width = 15, fig.height = 15}
-ggplot(fd_dev_true, aes(x = mean_val, y = diff_val, color = dataset_name)) +
+
+ggplot(fd_dev_true_avg, aes(x = mean_mean_val, y = mean_diff_val, color = dataset_name)) +
   geom_point(alpha = 0.6) +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE),
+  geom_hline(yintercept = mean(fd_dev_true_avg$mean_diff_val, na.rm = TRUE),
              linetype = "dashed", color = "blue") +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) + 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+  geom_hline(yintercept = mean(fd_dev_true_avg$mean_diff_val, na.rm = TRUE) + 1.96*sd(fd_dev_true_avg$mean_diff_val, na.rm = TRUE),
              linetype = "dotted", color = "red") +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) - 1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
+  geom_hline(yintercept = mean(fd_dev_true_avg$mean_diff_val, na.rm = TRUE) - 1.96*sd(fd_dev_true_avg$mean_diff_val, na.rm = TRUE),
              linetype = "dotted", color = "red") +
   facet_wrap(~metric_name, scales = "free") +
   theme_minimal(base_size = 14) +
-  labs(title = "Bland–Altman: any k vs true_k",
-       x = "Mean of k and true_k",
-       y = "Difference (k - true_k)")
-
+  labs(title = "Bland–Altman: any k vs true_k (averaged)",
+       x = "Mean of k and true_k (averaged)",
+       y = "Difference (k - true_k, averaged)")
 
 
 ```
 
-## Grid of Bland Altmans - misspecified k
+<!-- ## Grid of Bland Altmans - misspecified k -->
 
-More Bland Altmans
+<!-- More Bland Altmans -->
 
-```{r, fig.width = 50, fig.height = 30}
-ggplot(fd_dev_true,
-       aes(x = mean_val, y = diff_val, color = method_full)) +   # color by method_full
-  geom_point(alpha = 0.6) +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE),
-             linetype = "dashed", color = "blue") +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) + 
-                           1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
-             linetype = "dotted", color = "red") +
-  geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) - 
-                           1.96*sd(fd_dev_true$diff_val, na.rm = TRUE),
-             linetype = "dotted", color = "red") +
-  facet_grid(metric_name ~ dataset_name, scales = "free") +
-  theme_minimal(base_size = 14) +
-  labs(title = "Bland–Altman: any k vs true_k",
-       x = "Mean of k and true_k",
-       y = "Difference (k - true_k)")
+<!-- ```{r, fig.width = 50, fig.height = 30} -->
+<!-- ggplot(fd_dev_true, -->
+<!--        aes(x = mean_val, y = diff_val, color = method_full)) +   # color by method_full -->
+<!--   geom_point(alpha = 0.6) + -->
+<!--   geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE), -->
+<!--              linetype = "dashed", color = "blue") + -->
+<!--   geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) +  -->
+<!--                            1.96*sd(fd_dev_true$diff_val, na.rm = TRUE), -->
+<!--              linetype = "dotted", color = "red") + -->
+<!--   geom_hline(yintercept = mean(fd_dev_true$diff_val, na.rm = TRUE) -  -->
+<!--                            1.96*sd(fd_dev_true$diff_val, na.rm = TRUE), -->
+<!--              linetype = "dotted", color = "red") + -->
+<!--   facet_grid(metric_name ~ dataset_name, scales = "free") + -->
+<!--   theme_minimal(base_size = 14) + -->
+<!--   labs(title = "Bland–Altman: any k vs true_k", -->
+<!--        x = "Mean of k and true_k", -->
+<!--        y = "Difference (k - true_k)") -->
 
-```
+<!-- ``` -->
 
 ## Effects of misspecifying `k`, unreadable QC plot
 
 ```{r, fig.width = 30, fig.height = 30}
-true_vals <- fd %>%
-  filter(k == true_k) %>%
-  select(method_full, dataset_name, metric_name, run, seed, true_value = metric_value)
+## true_vals <- fd %>%
+##   filter(k == true_k) %>%
+##   select(method_full, dataset_name, metric_name, run, seed, true_value = metric_value)
+
+## fd_dev_k <- fd %>%
+##   group_by(method_full, dataset_name, metric_name, run, seed) %>%
+##   mutate(true_value = first(metric_value[k == true_k]),
+##          deviation_k = metric_value - true_value) %>%
+##   ungroup()
+
+## head(fd_dev_k)
+
+## ggplot(fd_dev_k, aes(x = factor(k_offset), y = deviation_k, color = method_full)) +
+##   geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) +
+##   facet_grid(dataset_name ~ metric_name, scales = "free_y") +
+##   theme_minimal(base_size = 14) +
+##   labs(title = "Deviation of metric across ks",
+##        subtitle = "Deviation vs value at true k",
+##        x = "k",
+##        y = "Perf metric deviation from true k") +
+##   scale_color_brewer(palette = "Set1")
 
 fd_dev_k <- fd %>%
   group_by(method_full, dataset_name, metric_name, run, seed) %>%
-  mutate(true_value = first(metric_value[k == true_k]),
+  mutate(true_value  = first(metric_value[k == true_k]),
          deviation_k = metric_value - true_value) %>%
   ungroup()
 
-ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method_full)) +
-  geom_point(alpha = 0.6, position = position_jitter(width = 0.15)) +
-  facet_grid(dataset_name ~ metric_name, scales = "free_y") +
-  theme_minimal(base_size = 14) +
-  labs(title = "Deviation of metric across ks",
-       subtitle = "Deviation vs value at true k",
-       x = "k",
-       y = "Perf metric deviation from true k") +
-  scale_color_brewer(palette = "Set1")
+# deduplicate: average across runs , only ARI
+fd_dev_k_avg <- fd_dev_k %>%
+    filter(metric_name == "adjusted_rand_score") %>%
+  group_by(method_full, dataset_name, metric_name, k, k_offset) %>%
+  summarise(
+    mean_deviation_k = mean(deviation_k, na.rm = TRUE),
+    .groups = "drop"
+  )
 
+# plot with avg values
+ggplot(fd_dev_k_avg, aes(x = k_offset, y = mean_deviation_k, color = method_full)) +
+  geom_point(alpha = 0.6, position = position_jitter(width = 0.15, height = 0)) +
+  facet_wrap(~dataset_name, scales = "free_y", ncol = 3) +
+  theme_minimal(base_size = 14) +
+  labs(title    = "Deviation of metric across k offsets",
+       x        = "Offset from true k",
+       y        = "Mean ARI deviation from that of true `k`") +
+  scale_color_brewer(palette = "Set1")
 ```
