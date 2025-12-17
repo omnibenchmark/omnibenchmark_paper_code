@@ -166,7 +166,7 @@ fd[cols_to_num] <- lapply(fd[cols_to_num], function(x) {
   as.numeric(x)
 })
 
-
+fd$k_offset <- fd$k - fd$true_k
 write.csv(fd, file = 'aggregated_results.csv')
 
 ```
@@ -206,96 +206,115 @@ print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
 )
 ```
 
+# Consistency checks
+
+Are there cputimes that are redudant/incosistent for repeated runs?
+
+```{r}
+str(fd)
+
+keys <- c("dataset_name", "method", "method_full", "generator",
+          "backend", "k", "seed", "run")
+
+fd_inconsistencies <- fd %>%
+  group_by(across(all_of(keys))) %>%
+  summarise(
+    n_cpu_time = n_distinct(cpu_time, na.rm = TRUE),
+    cpu_times  = list(unique(cpu_time)),
+    .groups = "drop"
+  ) %>%
+  filter(n_cpu_time > 1)
+
+stopifnot(nrow(fd_inconsistencies) == 0)
+```
+
+Seed consistencies
+
+```{r}
+keys <- c("dataset_name", "method", "method_full", "generator",
+          "backend", "run", "k", "metric_name")
+
+fd_seed_diff <- fd %>%
+  group_by(across(all_of(keys))) %>%
+  summarise(
+    n_seeds = n_distinct(seed),
+    n_metric_values = n_distinct(metric_value, na.rm = TRUE),
+    metric_values = list(unique(metric_value)),
+    .groups = "drop"
+  ) %>%
+  filter(n_seeds > 1 & n_metric_values > 1)
+
+stopifnot(nrow(fd_seed_diff) == 0)
+```
+
+`k` inconsistencies
+
+
+```{r}
+stopifnot(range(fd$k_offset) == c(-2, 2))
+```
+
+Are seeds ok? why is `fcps_method-FCPS_MinEnergy_seed-2` a method name, which seed is that? **looks wrong**
+
+```{r}
+table(fd$method_full, fd$seed)
+```
+
+
+
+
 # CPU by backend
 
-## Noncomplete observations
+## Censoring aware : cpu_time < 0.05 plotted as 0.05
 
-
-<!-- ```{r} -->
-<!-- print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ], -->
-<!--        aes(x = backend, y = cpu_time)) + -->
-<!--   geom_boxplot(outlier.alpha = 0.3) + -->
-<!--   # add points for each method/params combination -->
-<!--   geom_point(aes(color = method), -->
-<!--              alpha = 0.6, position = position_jitter(width = 0.15)) + -->
-<!--   # connect points across backends for same module+params -->
-<!--   geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k)), -->
-<!--             alpha = 0.1, color = "grey40") + -->
-<!--   theme_minimal(base_size = 14) + -->
-<!--   labs(title = "CPU time by backend", -->
-<!--        x = "Backend", -->
-<!--        y = "CPU time (s)") + -->
-<!--   scale_color_brewer(palette = "Set1") -->
-<!-- ) -->
-<!-- ``` -->
+We impute NA cpu_time as 0.05 s
 
 ```{r}
-print(ggplot(fd[fd$backend %in% c("conda","oras","envmodules"), ],
-       aes(x = backend, y = cpu_time)) +
+
+min(fd$cpu_time, na.rm = TRUE)
+fd$imputed_cpu_time <- ifelse(is.na(fd$cpu_time), no = fd$cpu_time, yes = 0.05)
+fd$censored_cpu_time  <- is.na(fd$cpu_time)
+
+## also, we average  for repeated runs, seeds and ks
+
+fd_avg <- fd %>%
+  filter(backend %in% c("conda","oras","envmodules")) %>%
+  group_by(backend, method, method_full, generator, dataset_name) %>%
+  summarise(imputed_cpu_time = mean(imputed_cpu_time, na.rm = TRUE),
+            censored_cpu_time = any(censored_cpu_time),
+            .groups = "drop")
+
+
+## str(fd_avg)
+## head(fd_avg)
+
+ggplot(fd_avg, aes(x = backend, y = imputed_cpu_time)) +
   geom_boxplot(outlier.alpha = 0.3) +
-  # add points for each method/params combination
-  geom_point(aes(color = method_full),
+  geom_point(aes(color = method_full, shape = censored_cpu_time),
              alpha = 0.6, position = position_jitter(width = 0.15)) +
-  # connect points across backends for same module+params
-  geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k)),
-            alpha = 0.1, color = "grey40") +
+  geom_line(aes(group = interaction(method, method_full, generator, dataset_name)),
+            alpha = 0.2, color = "grey40") +
   theme_minimal(base_size = 14) +
-  labs(title = "CPU time by backend",
+  facet_wrap(~method, scales = "free_y") + 
+  labs(title = "CPU time by backend - censored",
        x = "Backend",
        y = "CPU time (s)") +
-  scale_color_brewer(palette = "Set1")
-)
-```
+  scale_y_sqrt()
 
-## Complete observations
 
-Let's make sure we don't plot methods/datasets/params when one of the backends is not even recording performances because the run is so quick it ends before it's profiled:
-
-```{r, fig.width = 15, fig.height = 15}
-fd_complete <- fd %>%
-  filter(backend %in% c("conda","oras","envmodules")) %>%
-  group_by(method_full, dataset_name, seed, run, generator, k) %>%
-  # keep only groups that have all 3 backends and no NA cpu_time,
-    ## even if that means disregarding the superquick tasks that are not profiled by snmk
-  filter(n_distinct(backend) == 3, !any(is.na(cpu_time))) %>%
-  ungroup()
-
-print(ggplot(fd_complete, aes(x = backend, y = cpu_time)) +
-      geom_boxplot(outlier.alpha = 0.3) +
-      geom_point(aes(color = method_full),
-                 alpha = 0.6,
-                 position = position_jitter(width = 0.15)) +
-      geom_line(
-          aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k)),
-          alpha = 0.1,
-          color = "grey40"
-      ) +
-      facet_wrap(~method_full, scales = "free_y") +
-      theme_minimal(base_size = 14) +
-      labs(title = "CPU time by backend (only complete groups)",
-           x = "Backend",
-           y = "CPU time (s)"))
+ggplot(fd_avg, aes(x = backend, y = imputed_cpu_time)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  geom_point(aes(color = method_full, shape = censored_cpu_time),
+             alpha = 0.6, position = position_jitter(width = 0.15)) +
+  geom_line(aes(group = interaction(method, method_full, generator, dataset_name)),
+            alpha = 0.2, color = "grey40") +
+  theme_minimal(base_size = 14) +
+  facet_wrap(~method, scales = "free_y") + 
+  labs(title = "CPU time by backend - censored",
+       x = "Backend",
+       y = "CPU time (s)")
 
 ```
-
-```{r}
-print(
-  ggplot(fd_complete[fd_complete$backend %in% c("conda","oras","envmodules"), ],
-         aes(x = backend, y = cpu_time)) +
-    geom_boxplot(outlier.alpha = 0.3) +
-    geom_point(aes(color = method_full),
-               alpha = 0.6, position = position_jitter(width = 0.15)) +
-    geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k)),
-              alpha = 0.1, color = "grey40") +
-    theme_minimal(base_size = 14) +
-    facet_wrap(~method, scales = "free_y") + 
-    labs(title = "CPU time by backend",
-         x = "Backend",
-         y = "CPU time (s)")
-)
-```
-
-
 
 # Results consistency across backends
 
