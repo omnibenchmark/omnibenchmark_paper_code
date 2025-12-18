@@ -12,7 +12,7 @@ import json
 import re
 from pathlib import Path
 from typing import Dict, List, Optional
-
+import sys
 
 def parse_result_path(path: Path) -> List[Dict[str, str]]:
     """
@@ -27,10 +27,11 @@ def parse_result_path(path: Path) -> List[Dict[str, str]]:
     parts = path.parts
     base_result: Dict[str, str] = {}
 
+    # print("DEBUG parts:", parts, file = sys.stderr)
     # parse out_{backend}_seed_{seed}_run_{run}
     out_match = re.match(
         r"out_(?P<backend>[a-zA-Z0-9]+)_seed_(?P<seed>\d+)_run_(?P<run>\d+)",
-        parts[0]
+        parts[1]
     )
     if out_match:
         base_result["backend"] = out_match.group("backend")
@@ -185,7 +186,7 @@ def parse_metrics(config_dir: Path) -> Dict[str, Dict[str, Dict[str, float]]]:
 
 def find_results(
     base_dir: str = ".",
-    pattern: str = "out_*/data/clustbench/dataset_generator-*/clustering/*"
+    pattern: str = "results/out_*/data/clustbench/dataset_generator-*/clustering/*"
 ) -> List[Dict[str, str]]:
     """
     Return one record per configuration folder with parameters, performance, and metrics.
