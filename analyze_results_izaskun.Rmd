@@ -138,7 +138,7 @@ flatten_record <- function(rec) {
 ```{r}
 
 records <- fromJSON("aggregated_results.json", simplifyVector = FALSE)
-## records <- fromJSON("aggregated_results_full.json", simplifyVector = FALSE)
+##records <- fromJSON("aggregated_results_full.json", simplifyVector = FALSE)
 
 ## fd_list <- vector("list", length(records))
 ## for (i in seq_along(records)) {
@@ -172,13 +172,15 @@ fd$k <- as.integer(fd$k)
 fd$true_k <- as.integer(fd$true_k)
 
 cols_to_num <- c("max_rss","max_vms","max_uss","max_pss",
-                 "io_in","io_out","mean_load","cpu_time")
+                 "io_in","io_out","mean_load","cpu_time",
+                 'metric_value')
 
 fd[cols_to_num] <- lapply(fd[cols_to_num], function(x) {
   x[x == "NA"] <- NA_character_
   as.numeric(x)
 })
 
+fd <- fd[!is.na(fd$metric_value),]
 fd$k_offset <- fd$k - fd$true_k
 ## write.csv(fd, file = 'aggregated_results.csv') ## later, this needs extra cleaning
 ```
@@ -261,6 +263,7 @@ stopifnot(nrow(fd_seed_diff) == 0)
 
 
 ```{r}
+fd <- fd[!is.na(fd$k),]
 stopifnot(range(fd$k_offset) == c(-2, 2))
 ```
 
@@ -569,6 +572,7 @@ ggplot(fd_avg, aes(x = backend, y = mean_value)) +
 Mind there is no such a thing as true k, we use the first labelset.
 
 ```{r, fig.height = 10, fig.width = 13}
+fd$metric_value <- as.numeric(fd$metric_value)
 
 fd_dev_k <- fd %>%
   group_by(method_full, dataset_name, metric_name) %>%
