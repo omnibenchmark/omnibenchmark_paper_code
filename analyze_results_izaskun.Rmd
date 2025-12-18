@@ -23,6 +23,7 @@ library(tidyverse)
 library(jsonlite)
 library(ggplot2)
 library(data.table)
+library(parallel)
 
 knitr::opts_chunk$set(
   echo    = TRUE,
@@ -137,14 +138,26 @@ flatten_record <- function(rec) {
 ```{r}
 
 records <- fromJSON("aggregated_results.json", simplifyVector = FALSE)
+##records <- fromJSON("aggregated_results_full.json", simplifyVector = FALSE)
 
-fd_list <- vector("list", length(records))
-for (i in seq_along(records)) {
+## fd_list <- vector("list", length(records))
+## for (i in seq_along(records)) {
+##   if (i == 1 || i == 2 || i == 100 || i %% 1000 == 0)
+##       cat("Processing record", i, "of", length(records), "\n")
+##   fd_list[[i]] <- flatten_record(records[[i]])
+## }
+## fd <- data.table::rbindlist(fd_list, use.names = TRUE, fill = TRUE)
+
+
+# parallel apply instead
+fd_list <- mclapply(seq_along(records), function(i) {
   if (i == 1 || i == 2 || i == 100 || i %% 1000 == 0)
-      cat("Processing record", i, "of", length(records), "\n")
-  fd_list[[i]] <- flatten_record(records[[i]])
-}
-fd <- data.table::rbindlist(fd_list, use.names = TRUE, fill = TRUE)
+    cat("Processing record", i, "of", length(records), "\n")
+  flatten_record(records[[i]])
+}, mc.cores = detectCores())
+
+fd <- rbindlist(fd_list, use.names = TRUE, fill = TRUE)
+
 
 ## dim(fd)
 
@@ -168,7 +181,6 @@ fd[cols_to_num] <- lapply(fd[cols_to_num], function(x) {
 
 fd$k_offset <- fd$k - fd$true_k
 ## write.csv(fd, file = 'aggregated_results.csv') ## later, this needs extra cleaning
-
 ```
 
 # QC
@@ -254,38 +266,29 @@ stopifnot(nrow(fd_seed_diff) == 0)
 stopifnot(range(fd$k_offset) == c(-2, 2))
 ```
 
-Are seeds ok? why is `fcps_method-FCPS_MinEnergy_seed-2` a method name, which seed is that? **looks wrong**
+We are running some methods more times with different seeds, even if they don't use seeds at all. Removing these different "seeds" that are not such but runs. We have repeated/controlled runs separately.
 
 ```{r}
 
-table(fd$method_full, fd$seed)
-table(fd$method, fd$seed)
-```
-
-Are we stupidly running some methods more times with different seeds, even if they don't use seeds at all? then remove them
-
-```{r}
-head(fd)
-table(fd$method_full)
-
-
-## flag methods that explicitly encode a seed.
-## filter(has_seed | seed == 1),  keep all rows for seed‑encoded methods, but only seed==1 otherwise
+## seed 2 for seed-unaware methods, all seed for seed-aware methods
 fd_clean <- fd %>%
-  mutate(has_seed = grepl("seed-", method_full),
-         seed     = ifelse(has_seed, as.character(seed), "none")) %>%
-  filter(has_seed | seed == "none")
+  mutate(has_seed = grepl("seed-", method_full)) %>%
+  filter(
+    (has_seed) | (!has_seed & seed == 2)   # keep all seeds if encoded, else only seed==2
+  ) %>%
+  mutate(seed = ifelse(has_seed, as.character(seed), "none"))
 
-dim(fd_clean)
-dim(fd)
-table(fd$seed, useNA = 'always')
-table(fd_clean$seed, useNA = 'always')
+
+table(fd$seed, grepl('seed', fd$method_full), useNA = 'always')
+table(fd_clean$seed, grepl('seed', fd_clean$method_full), useNA = 'always')
 
 fd <- fd_clean
 
 rm(fd_clean)
 
 write.csv(fd, file = 'aggregated_results.csv')
+# write.csv(fd, file = 'aggregated_results_full.csv')
+
 ```
 
 
@@ -345,55 +348,84 @@ ggplot(fd_avg, aes(x = backend, y = imputed_cpu_time)) +
 
 # Results consistency across backends
 
-<!-- ## Unreadable perf metrics plot -->
-
-<!-- ```{r, fig.width = 30, fig.height = 30} -->
-
-<!-- print( -->
-<!--   ggplot(fd, aes(x = backend, y = metric_value)) + -->
-<!--   # boxplots still colored by backend -->
-<!--   geom_boxplot(aes(fill = backend), outlier.alpha = 0.3) + -->
-<!--   # points colored by run -->
-<!--   geom_point(aes(color = run), -->
-<!--              alpha = 0.6, -->
-<!--              position = position_jitter(width = 0.15)) + -->
-<!--   # connect points across backends for same method/params/run/etc. -->
-<!--   geom_line(aes(group = interaction(method, method_full, seed, run, generator, dataset_name, k), -->
-<!--                 color = run), -->
-<!--             alpha = 0.2) + -->
-<!--   facet_wrap(dataset_name ~ metric_name, scales = "free_y") + -->
-<!--   theme_minimal(base_size = 14) + -->
-<!--   labs(title = "Metrics consistency across backends (stage = methods)", -->
-<!--        x = "Backend", -->
-<!--        y = "Metric Value") + -->
-<!--   scale_fill_brewer(palette = "Set1") + -->
-<!--   scale_color_brewer(palette = "Dark2")) -->
-
-<!-- ``` -->
-
 # Pairwise correlations
 
-```{r}
-df_run <- fd %>%
-  select(dataset_name, method, k, metric_name, run, seed, backend, metric_value)
-
-
-# a bit of collapsing here
+```{r, fig.width = 9}
 wide_run <- fd %>%
   filter(backend %in% c("conda","oras","envmodules")) %>%
   group_by(dataset_name, method, k, metric_name, run, seed, backend) %>%
   summarise(metric_value = mean(as.numeric(metric_value), na.rm = TRUE), .groups = "drop") %>%
-  pivot_wider(names_from = backend, values_from = metric_value)
+  tidyr::pivot_wider(names_from = backend, values_from = metric_value, values_fill = NA)
 
-cors_run <- wide_run %>%
-  group_by(metric_name) %>%
+head(wide_run)
+
+# Compute correlations per metric_name AND seed and for pairwise complete obs
+cors_seed <- wide_run %>%
+  group_by(metric_name, seed) %>%
   summarise(
-    cor_conda_oras   = cor(conda, oras, use="complete.obs"),
-    cor_conda_envmodules  = cor(conda, envmodules, use="complete.obs"),
-    cor_oras_envmodules = cor(oras, envmodules, use="complete.obs")
-  )
+    cor_conda_oras = if(sum(complete.cases(conda, oras)) > 1) 
+                       cor(conda, oras, use = "complete.obs") else NA_real_,
+    cor_conda_envmodules = if(sum(complete.cases(conda, envmodules)) > 1) 
+                       cor(conda, envmodules, use = "complete.obs") else NA_real_,
+    cor_oras_envmodules = if(sum(complete.cases(oras, envmodules)) > 1) 
+                       cor(oras, envmodules, use = "complete.obs") else NA_real_,
+    .groups = "drop")
+
 
 print(cors_run)
+
+cors_long <- cors_seed %>%
+  pivot_longer(
+    cols = starts_with("cor_"),
+    names_to = "pair",
+    values_to = "correlation")
+
+
+ggplot(cors_long, aes(x = pair, y = interaction(metric_name, seed), fill = correlation)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(correlation, 2)), color = "black", size = 3) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0,
+                       limits = c(-1, 1), na.value = "grey90") +
+  theme_minimal(base_size = 12) +
+  labs(title = "Backend correlations per metric and seed",
+       x = "Backend pair",
+       y = "Metric and seed",
+       fill = "cor coef")
+
+```
+
+And the repeated runs?
+
+```{r}
+
+wide_run <- fd %>%
+  filter(backend %in% c("conda","oras","envmodules")) %>%
+  group_by(dataset_name, method, k, metric_name, run, seed, backend) %>%
+  summarise(metric_value = mean(as.numeric(metric_value), na.rm = TRUE), .groups = "drop") %>%
+  unite("backend_run", backend, run, sep = "_") %>%   # combine backend and run
+  pivot_wider(names_from = backend_run, values_from = metric_value, values_fill = NA)
+
+
+# only correlating aggregated metrics
+num_cols <- wide_run %>%
+  select(where(is.numeric), -k, -seed)
+
+
+# pairwise cors, so including repeated runs with the same backend
+cors_all <- cor(num_cols, use = "pairwise.complete.obs")
+
+cors_df <- melt(cors_all)
+
+# heatmap with correlation coefficients
+ggplot(cors_df, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(value, 2)), color = "black", size = 3) +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0,
+                       limits = c(-1, 1), na.value = "grey90") +
+  theme_minimal(base_size = 12) +
+  labs(title = "Metric correlation per backend and repeated run",
+       x = "backend and run", y = "backend and run", fill = "Correlation")
+
 
 ```
 
@@ -506,7 +538,7 @@ ggplot(fd_avg, aes(x = backend, y = mean_value)) +
 
 Mind there is no such a thing as true k, we use the first labelset.
 
-```{r}
+```{r, fig.height = 7, fig.width = 10}
 
 fd_dev_k <- fd %>%
   group_by(method_full, dataset_name, metric_name) %>%
@@ -532,7 +564,7 @@ ggplot(fd_dev_k, aes(x = factor(k), y = deviation_k, color = method_full)) +
 ## By k offset
 
 
-```{r}
+```{r, fig.width = 10, fig.height = 7}
 ## str(fd)
 fd_dev_k <- fd %>%
   group_by(method_full, dataset_name, metric_name) %>%
@@ -548,8 +580,6 @@ fd_dev_k_avg <- fd_dev_k %>%
     mean_deviation_k = mean(deviation_k, na.rm = TRUE),
     .groups = "drop"
   )
-
-head(fd_dev_k_avg)
 
 ggplot(fd_dev_k_avg, aes(x = k_offset, y = mean_deviation_k, color = method_full)) +
   geom_point(alpha = 0.6, position = position_jitter(width = 0.15, height = 0)) +
@@ -574,7 +604,7 @@ ggplot(fd_dev_k_avg, aes(x = k_offset, y = mean_deviation_k, color = dataset_nam
 
 adj Rand index only
 
-```{r}
+```{r, fig.height = 6, fig.width = 6}
 # ilter to adjusted_rand_score only
 fd_dev_k_ars <- fd_dev_k_avg %>%
   filter(metric_name == "adjusted_rand_score")
@@ -600,61 +630,6 @@ ggplot(fd_dev_k_ars, aes(x = k_offset, y = mean_deviation_k, color = dataset_nam
 
 ```
 
-# Impact of seeds and repeated runs
-
-
-What about the consistency across runs and seeds? e.g., do different seeds produce different results?
-
-Only at true k.
-
-Double check this is correct...
-
-
-
-```{r}
-
-fd_true <- fd %>% filter(k == true_k)
-
-fd_dev_seed <- fd_true %>%
-  group_by(method_full, dataset_name, metric_name, run) %>%
-  mutate(
-    mean_true_val = mean(metric_value, na.rm = TRUE),
-    deviation_seed = metric_value - mean_true_val
-  ) %>%
-  ungroup()
-
-## floats strike again...
-tol <- sqrt(.Machine$double.eps)
-fd_dev_seed <- fd_dev_seed %>%
-  mutate(deviation_seed = ifelse(abs(deviation_seed) < tol, 0, deviation_seed))
-
-
-summary(fd_dev_seed)
-
-
-## ggplot(fd_dev_seed, aes(x = factor(seed), y = deviation_seed, color = method_full)) +
-##   geom_point(alpha = 0.6) +
-##   theme_minimal(base_size = 14) +
-##   labs(title = "Deviation at true k across seeds",
-##        x = "Seed",
-##        y = "Deviation from mean across seeds")
-
-
-fd_dev_run <- fd_true %>%
-  group_by(method_full, dataset_name, metric_name, seed) %>%
-  mutate(
-    mean_true_val = mean(metric_value, na.rm = TRUE),
-    deviation_run = metric_value - mean_true_val
-  ) %>%
-  ungroup()
-
-tol <- sqrt(.Machine$double.eps)
-fd_dev_run <- fd_dev_run %>%
-  mutate(deviation_run = ifelse(abs(deviation_run) < tol, 0, deviation_run))
-
-summary(fd_dev_run)
-
-```
 
 # Comp vs clustering performance trade-offs
 
@@ -819,7 +794,7 @@ ggplot(fd_dev_true_avg, aes(x = mean_mean_val, y = mean_diff_val, color = datase
 
 ## Effects of misspecifying `k`, unreadable QC plot
 
-```{r, fig.width = 30, fig.height = 30}
+```{r, fig.width = 15, fig.height = 15}
 ## true_vals <- fd %>%
 ##   filter(k == true_k) %>%
 ##   select(method_full, dataset_name, metric_name, run, seed, true_value = metric_value)
