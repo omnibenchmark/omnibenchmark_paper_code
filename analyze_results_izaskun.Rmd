@@ -304,6 +304,38 @@ write.csv(fd, file = 'aggregated_results.csv')
 
 # CPU by backend
 
+## QC by backend scatterplots
+
+
+```{r, fig.width = 7, fig.height = 5}
+
+wide_cpu <- fd %>%
+  filter(backend %in% c("conda","envmodules","oras")) %>%
+  group_by(dataset_name, method, method_full, seed, run, backend) %>%
+  summarise(cpu_time = mean(as.numeric(cpu_time), na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = backend, values_from = cpu_time)
+
+ggplot(wide_cpu, aes(x = conda, y = oras, color = method)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "CPU time: conda vs oras",
+       x = "conda", y = "oras") +
+  theme_minimal()
+
+ggplot(wide_cpu, aes(x = conda, y = envmodules,  color = method)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "CPU time: conda vs envmodules",
+       x = "conda", y = "envmodules") +
+  theme_minimal()
+
+ggplot(wide_cpu, aes(x = oras, y = envmodules,  color = method)) +
+  geom_point(alpha = 0.6) +
+  labs(title = "CPU time: oras vs envmodules",
+       x = "oras", y = "envmodules") +
+  theme_minimal()
+
+
+```
+
 ## Censoring aware : cpu_time < 0.05 plotted as 0.05
 
 We impute NA cpu_time as 0.05 s
@@ -635,7 +667,7 @@ ggplot(fd_dev_k_avg, aes(x = k_offset, y = mean_deviation_k, color = dataset_nam
 
 adj Rand index only
 
-```{r, fig.height = 6, fig.width = 8}
+```{r, fig.height = 6, fig.width = 16}
 # ilter to adjusted_rand_score only
 fd_dev_k_ars <- fd_dev_k_avg %>%
   filter(metric_name == "adjusted_rand_score")
