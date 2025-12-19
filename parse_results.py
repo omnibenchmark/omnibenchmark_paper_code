@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Simple script to parse clustbench results with glob pattern matching.
+Parse clustbench results with glob pattern matching.
 
-Pattern: out-{backend}-{rep}/data/clustbench/dataset_generator-{generator}_dataset_name-{name}/clustering/{method}
+Pattern:
+out-{backend}_seed-{seed}_run-{run}/data/clustbench/dataset_generator-{generator}_dataset_name-{name}/clustering/{method}
 """
 
 import csv
@@ -11,66 +12,92 @@ import json
 import re
 from pathlib import Path
 from typing import Dict, List, Optional
+import sys
 
-
-def parse_result_path(path: Path) -> Dict[str, str]:
+def parse_result_path(path: Path) -> List[Dict[str, str]]:
     """
-    Parse a result path and extract components.
+    Parse a result path and extract components:
+    - backend, seed, run (from out_* directories)
+    - dataset generator and dataset name
+    - method (immediate folder after clustering/)
+    - method_full (method + variant symlink/subdir)
 
-    Pattern: out-{backend}-{rep}/data/clustbench/dataset_generator-{generator}_dataset_name-{name}/clustering/{method}
+    Returns a list of dicts, one per available variant directory under {method}.
     """
     parts = path.parts
+    base_result: Dict[str, str] = {}
 
-    result = {}
-
-    # Parse out-{backend}-{rep}
-    out_match = re.match(r'out-([^-]+)-(\d+)', parts[0])
+    # print("DEBUG parts:", parts, file = sys.stderr)
+    # parse out_{backend}_seed_{seed}_run_{run}
+    out_match = re.match(
+        r"out_(?P<backend>[a-zA-Z0-9]+)_seed_(?P<seed>\d+)_run_(?P<run>\d+)",
+        parts[1]
+    )
     if out_match:
-        result['backend'] = out_match.group(1)
-        result['rep'] = out_match.group(2)
+        base_result["backend"] = out_match.group("backend")
+        base_result["seed"] = out_match.group("seed")
+        base_result["run"] = out_match.group("run")
 
-    # Find dataset_generator part
+    # find dataset_generator part
     for part in parts:
-        if part.startswith('dataset_generator-'):
-            # Parse dataset_generator-{generator}_dataset_name-{name}
-            dataset_match = re.match(r'dataset_generator-([^_]+)_dataset_name-(.+)', part)
+        if part.startswith("dataset_generator-"):
+            dataset_match = re.match(
+                r"dataset_generator-([^_]+)_dataset_name-(.+)", part
+            )
             if dataset_match:
-                result['generator'] = dataset_match.group(1)
-                result['dataset_name'] = dataset_match.group(2)
+                base_result["generator"] = dataset_match.group(1)
+                base_result["dataset_name"] = dataset_match.group(2)
             break
 
-    # The method is the last part (after clustering/)
-    if 'clustering' in parts:
-        clustering_idx = parts.index('clustering')
+    results: List[Dict[str, str]] = []
+
+    # The method is the folder after clustering/
+    if "clustering" in parts:
+        clustering_idx = parts.index("clustering")
         if clustering_idx + 1 < len(parts):
-            result['method'] = parts[clustering_idx + 1]
+            method_dir = parts[clustering_idx + 1]
+            base_result["method"] = method_dir
 
-    result['path'] = str(path)
+            method_path = path
+            if method_path.is_dir():
+                for child in method_path.iterdir():
+                    # skip hidden dirs, hashes, and metrics folder
+                    if child.name.startswith("."):
+                        continue
+                    if re.fullmatch(r"[0-9a-f]{32,}", child.name):
+                        continue
+                    if re.fullmatch(r"[0-9a-f]{8,}", child.name):
+                        continue
+                    if child.name == "metrics":
+                        continue
 
-    return result
+                    if child.is_symlink() or child.is_dir():
+                        r = base_result.copy()
+                        r["method_full"] = f"{method_dir}_{child.name}"
+                        r["path"] = str(child)
+                        results.append(r)
+            else:
+                r = base_result.copy()
+                r["method_full"] = "/".join(parts[clustering_idx + 1:])
+                r["path"] = str(path)
+                results.append(r)
+
+    return results
 
 
 def parse_performance_file(perf_file: Path) -> Optional[Dict]:
-    """
-    Parse a clustbench_performance.txt file (TSV format).
-
-    Returns:
-        Dictionary with performance metrics, or None if file doesn't exist
-    """
+    """Parse a clustbench_performance.txt file (TSV format)."""
     if not perf_file.exists():
         return None
 
     try:
         with open(perf_file, 'r') as f:
             reader = csv.DictReader(f, delimiter='\t')
-            # Get the first (and only) data row
             for row in reader:
-                # Convert values to appropriate types
                 result = {}
                 for key, value in row.items():
                     if value:
                         value = value.strip()
-                        # Keep h:m:s as string, convert others to float
                         if key == 'h:m:s':
                             result[key] = value
                         else:
@@ -88,208 +115,158 @@ def parse_performance_file(perf_file: Path) -> Optional[Dict]:
 
 
 def parse_metric_scores(scores_file: Path) -> Optional[Dict[str, float]]:
-    """
-    Parse a clustbench.scores.gz file.
-    
-    Format:
-    k=2,k=2,k=2,k=3,k=4
-    1.0,1.0,1.0,0.7671742903354675,0.7289468426413069
-    
-    Returns:
-        Dictionary mapping k values to scores, or None if file doesn't exist
-    """
+    """Parse a clustbench.scores.gz file into {k: score} dict."""
     if not scores_file.exists():
         return None
-    
+
     try:
         with gzip.open(scores_file, 'rt') as f:
             lines = f.readlines()
-            
+
         if len(lines) != 2:
             return {'error': f'Expected 2 lines, got {len(lines)}'}
-        
-        # Parse header (k values) - extract integers from "k=2" format
-        k_strings = [k.strip() for k in lines[0].strip().split(',')]
+
+        k_strings = [k.strip().strip('"') for k in lines[0].strip().split(',')]
         k_values = []
         for k_str in k_strings:
-            match = re.match(r'k=(\d+)', k_str)
-            if match:
-                k_values.append(int(match.group(1)))
+            m = re.match(r'k=(\d+)', k_str)
+            if m:
+                k_values.append(int(m.group(1)))
             else:
                 return {'error': f'Invalid k format: {k_str}'}
-        
-        # Parse scores
-        scores = [float(s.strip()) for s in lines[1].strip().split(',')]
-        
+
+        score_strings = [s.strip().strip('"') for s in lines[1].strip().split(',')]
+        scores = []
+        for s in score_strings:
+            try:
+                scores.append(float(s))
+            except ValueError:
+                return {'error': f'Invalid score: {s}'}
+
         if len(k_values) != len(scores):
             return {'error': f'Mismatch: {len(k_values)} k values, {len(scores)} scores'}
-        
-        # Build result dict, checking for duplicate k values with different scores
+
         result = {}
         for k, score in zip(k_values, scores):
-            if k in result:
-                # Check if the score is different
-                if abs(result[k] - score) > 1e-10:
-                    raise ValueError(f'Duplicate k value {k} with different scores: {result[k]} vs {score}')
-            else:
-                result[k] = score
-        
+            if k in result and abs(result[k] - score) > 1e-10:
+                return {'error': f'Duplicate k {k} with differing scores'}
+            result[k] = score
+
         return result
-        
+
     except Exception as e:
         return {'error': str(e)}
 
 
-def parse_metrics(param_dir: Path) -> Dict[str, Dict[str, Dict[str, float]]]:
-    """
-    Parse metrics from a parameter directory.
-    
-    Structure: {param_dir}/metrics/{metric_family}/metric-{metric_name}/clustbench.scores.gz
-    
-    Returns:
-        Nested dict: {metric_family: {metric_name: {k: score}}}
-    """
+def parse_metrics(config_dir: Path) -> Dict[str, Dict[str, Dict[str, float]]]:
+    """Parse metrics from a configuration directory."""
     metrics = {}
-    metrics_dir = param_dir / 'metrics'
-    
+    metrics_dir = config_dir / 'metrics'
     if not metrics_dir.exists():
         return metrics
-    
-    # Iterate over metric families
+
     for family_dir in metrics_dir.iterdir():
         if not family_dir.is_dir():
             continue
-        
         family_name = family_dir.name
         metrics[family_name] = {}
-        
-        # Iterate over metrics in this family
         for metric_dir in family_dir.iterdir():
             if not metric_dir.is_dir():
                 continue
-            
-            # Extract metric name from metric-{name} pattern
             metric_match = re.match(r'metric-(.+)', metric_dir.name)
             if not metric_match:
                 continue
-            
             metric_name = metric_match.group(1)
-            
-            # Parse the scores file
             scores_file = metric_dir / 'clustbench.scores.gz'
             scores = parse_metric_scores(scores_file)
-            
             if scores:
                 metrics[family_name][metric_name] = scores
-    
     return metrics
 
 
-def find_results(base_dir: str = '.', pattern: str = 'out-*/data/clustbench/dataset_generator-*/clustering/*') -> List[Dict[str, str]]:
+def find_results(
+    base_dir: str = ".",
+    pattern: str = "results/out_*/data/clustbench/dataset_generator-*/clustering/*"
+) -> List[Dict[str, str]]:
     """
-    Find all result directories matching the pattern.
-
-    Args:
-        base_dir: Base directory to search from
-        pattern: Glob pattern to match
-
-    Returns:
-        List of parsed result dictionaries
+    Return one record per configuration folder with parameters, performance, and metrics.
     """
     base_path = Path(base_dir)
-    results = []
+    results: List[Dict[str, str]] = []
 
     for path in base_path.glob(pattern):
-        if path.is_dir():
-            # Skip hidden directories (starting with .)
-            if not any(part.startswith('.') for part in path.parts):
-                parsed = parse_result_path(path)
+        if not path.is_dir():
+            continue
+        if any(part.startswith(".") for part in path.parts):
+            continue
 
-                # Find all parameter directories (subdirectories with parameter patterns)
-                param_dirs = [d for d in path.iterdir() if d.is_dir() and not d.name.startswith('.')]
+        variants = parse_result_path(path)
+        for variant in variants:
+            config_dir = Path(variant["path"])
+            if not config_dir.is_dir() or config_dir.name == "metrics":
+                continue
 
-                if param_dirs:
-                    # Parse configurations and their performance
-                    parsed['configurations'] = []
+            record = variant.copy()
 
-                    # Assume first param_dir for method-level data
-                    first_param_dir = param_dirs[0]
+            # Parameters
+            params_file = config_dir / "parameters.json"
+            parameters = None
+            if params_file.exists():
+                try:
+                    with open(params_file, "r") as f:
+                        parameters = json.load(f)
+                except Exception as e:
+                    parameters = {"error": str(e)}
+            record["parameters"] = parameters
+            record["parameter_dir"] = config_dir.name
 
-                    # Parse performance file at method level
-                    perf_file = first_param_dir / 'clustbench_performance.txt'
-                    performance = parse_performance_file(perf_file)
-                    if performance:
-                        parsed['performance'] = performance
+            # Performance
+            perf_file = config_dir / "clustbench_performance.txt"
+            performance = parse_performance_file(perf_file)
+            if performance:
+                record["performance"] = performance
 
-                    # Parse metrics at method level
-                    metrics = parse_metrics(first_param_dir)
-                    if metrics:
-                        parsed['metrics'] = metrics
+            # Metrics
+            metrics = parse_metrics(config_dir)
+            if metrics:
+                record["metrics"] = metrics
 
-                    # Add method_params and method_full at method level
-                    method_params = first_param_dir.name
+            # Normalize method name
+            m = re.match(r"method-([^_]+)", config_dir.name)
+            if m:
+                record["method"] = m.group(1)
 
-                    # Extract method from method-{method} pattern if present
-                    method_match = re.match(r'method-([^_]+)', method_params)
-                    if method_match:
-                        extracted_method = method_match.group(1)
-                        parsed['method'] = extracted_method
+            # Ensure method_full includes config dir name once
+            variant_name = record["method_full"]
+            if config_dir.name not in variant_name:
+                record["method_full"] = f"{variant_name}_{config_dir.name}"
 
-                    method_full = f"{parsed.get('method', '')}_{method_params}"
-                    parsed['method_params'] = method_params
-                    parsed['method_full'] = method_full
-
-                    for param_dir in param_dirs:
-                        # Load parameters.json if it exists
-                        params_file = param_dir / 'parameters.json'
-                        parameters = None
-                        if params_file.exists():
-                            try:
-                                with open(params_file, 'r') as f:
-                                    parameters = json.load(f)
-                            except Exception as e:
-                                parameters = {'error': str(e)}
-
-                        config = {
-                            'parameter_dir': param_dir.name,
-                            'parameters': parameters
-                        }
-
-                        parsed['configurations'].append(config)
-
-                results.append(parsed)
+            record["path"] = str(config_dir)
+            results.append(record)
 
     return results
 
 
 def main():
-    """Main function to run the parser."""
-    # Find all matching results
     results = find_results()
-
-    # Print as JSON
     print(json.dumps(results, indent=2))
 
-    # Print summary
-    print(f"\n# Found {len(results)} result directories", file=__import__('sys').stderr)
+    # Summary to stderr
+    import sys
+    print(f"\n# Found {len(results)} result directories", file=sys.stderr)
 
-    # Group by backend, generator, method
-    by_backend = {}
-    by_generator = {}
-    by_method = {}
-
+    by_backend, by_generator, by_method = {}, {}, {}
     for r in results:
         backend = r.get('backend', 'unknown')
         generator = r.get('generator', 'unknown')
         method = r.get('method', 'unknown')
-
         by_backend[backend] = by_backend.get(backend, 0) + 1
         by_generator[generator] = by_generator.get(generator, 0) + 1
         by_method[method] = by_method.get(method, 0) + 1
 
-    print(f"# By backend: {by_backend}", file=__import__('sys').stderr)
-    print(f"# By generator: {by_generator}", file=__import__('sys').stderr)
-    print(f"# By method: {by_method}", file=__import__('sys').stderr)
+    print(f"# By backend: {by_backend}", file=sys.stderr)
+    print(f"# By generator: {by_generator}", file=sys.stderr)
+    print(f"# By method: {by_method}", file=sys.stderr)
 
 
 if __name__ == '__main__':
