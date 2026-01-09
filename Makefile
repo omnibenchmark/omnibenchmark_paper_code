@@ -33,11 +33,11 @@ EASYBUILD_PREFIX ?= /data/imallona/.local/easybuild
 export EASYBUILD_PREFIX
 
 # omnibenchmark command template
-OB_CMD = ob run benchmark --local-storage --cores ${MAX_CORES}
+OB_CMD = ob run benchmark --local-storage --cores ${MAX_CORES} --continue-on-error --task-timeout 1min --yes
 
 # actual benchmark plan repository - to be pinned (the commit/tag)
 CLUSTERING_REPO   = https://github.com/omnibenchmark/clustering_example
-CLUSTERING_BRANCH = longer_yamls
+CLUSTERING_BRANCH = full_yamls
 CLUSTERING_DIR	  = clustering_example
 
 # legacy reports in the wrong repository; to be moved to this one
@@ -45,10 +45,10 @@ REPORTS_REPO = https://github.com/imallona/clustering_report
 REPORTS_DIR = clustering_report
 
 ## seeds to explore
-SEEDS := 2 54 546 744 1443
+SEEDS := 2 54# 546 744 1443
 
 ## repeated runs per seed
-RUNS := 1 2 3
+RUNS := 1 2#3
 
 all: clone_yamls clone_reports run_conda run_oras run_envs knit_report
 
