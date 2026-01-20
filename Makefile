@@ -26,31 +26,35 @@
 # ============================================================
 
 
-MAX_CORES ?= 250
+MAX_CORES ?= 10
 
 # EasyBuild installation prefix (imallona; edit accordingly) ## <------------------------------------!!!!
 EASYBUILD_PREFIX ?= /data/imallona/.local/easybuild
 export EASYBUILD_PREFIX
 
 # omnibenchmark command template
-OB_CMD = ob run benchmark --local-storage --cores ${MAX_CORES} --continue-on-error --task-timeout 1min --yes
+OB_CMD = ob run --cores ${MAX_CORES} --continue-on-error --task-timeout 10min --yes
 
 # actual benchmark plan repository - to be pinned (the commit/tag)
 CLUSTERING_REPO   = https://github.com/omnibenchmark/clustering_example
-CLUSTERING_BRANCH = full_yamls
+CLUSTERING_BRANCH = update-to-0.4
 CLUSTERING_DIR	  = clustering_example
 
 # legacy reports in the wrong repository; to be moved to this one
-REPORTS_REPO = https://github.com/imallona/clustering_report
-REPORTS_DIR = clustering_report
+REPORTS_REPO   = https://github.com/imallona/clustering_report
+REPORTS_BRANCH = 040
+REPORTS_DIR    = clustering_report
 
 ## seeds to explore
-SEEDS := 2 54# 546 744 1443
+SEEDS := 2 #54# 546 744 1443
 
 ## repeated runs per seed
-RUNS := 1 2#3
+RUNS := 1 #2#3
 
 all: clone_yamls clone_reports run_conda run_oras run_envs knit_report
+
+clean:
+	/bin/rm -rf results/ clustering_example/ clustering_report/ .omnibenchmark/ .snakemake/
 
 # clone the clustering_example repo if not already present
 clone_yamls:
@@ -62,11 +66,11 @@ clone_yamls:
 		cd $(CLUSTERING_DIR) && git fetch  && git checkout ${CLUSTERING_BRANCH} && git pull; \
 	fi
 
-# clone the clustering_report repo (mark branch) if not already present
+# clone the clustering_report repo if not already present
 clone_reports:
 	@if [ ! -d "$(REPORTS_DIR)" ]; then \
 		echo "Cloning clustering_report repo (branch mark)..."; \
-		git clone --branch mark $(REPORTS_REPO) $(REPORTS_DIR); \
+		git clone --branch $(REPORTS_BRANCH) $(REPORTS_REPO) $(REPORTS_DIR); \
 	else \
 		echo "clustering_report repo already present, pulling latest..."; \
 		cd $(REPORTS_DIR) && git pull; \
@@ -81,7 +85,7 @@ run_conda: clone_yamls
 		for i in $(RUNS); do \
 			echo "  Run $$i for seed $$seed and run $$i."; \
                         echo "DEST: results/out_conda_seed_$$seed\_run_$$i" ;\
-			${OB_CMD} -b $(CLUSTERING_DIR)/Clustering_conda_tmp.yml --out-dir results/out_conda_seed_$$seed\_run_$$i; \
+			${OB_CMD} $(CLUSTERING_DIR)/Clustering_conda_tmp.yml --out-dir results/out_conda_seed_$$seed\_run_$$i; \
 			cp $(CLUSTERING_DIR)/Clustering_conda_tmp.yml results/out_conda_seed_$$seed\_run_$$i/; \
 		done; \
 	done
@@ -93,7 +97,7 @@ run_oras: clone_yamls
 		sed -i "s/--seed\",[[:space:]]*[0-9]\+/--seed\", $$seed/" $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
 		for i in $(RUNS); do \
 			echo "  Run $$i for seed $$seed and run $$i."; \
-			${OB_CMD} -b $(CLUSTERING_DIR)/Clustering_oras_tmp.yml --out-dir results/out_oras_seed_$$seed\_run_$$i/; \
+			${OB_CMD} $(CLUSTERING_DIR)/Clustering_oras_tmp.yml --out-dir results/out_oras_seed_$$seed\_run_$$i/; \
 			cp $(CLUSTERING_DIR)/Clustering_oras_tmp.yml results/out_oras_seed_$$seed\_run_$$i/; \
 		done; \
 	done
@@ -111,7 +115,7 @@ run_envs: clone_yamls
 			sed -i "s/--seed\",[[:space:]]*[0-9]\+/--seed\", $$seed/" $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
  			for i in $(RUNS); do \
  				echo "  Run $$i for seed $$seed and run $$i..."; \
- 				${OB_CMD} -b $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml --out-dir results/out_envmodules_seed_$$seed\_run_$$i/; \
+ 				${OB_CMD} $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml --out-dir results/out_envmodules_seed_$$seed\_run_$$i/; \
  				cp $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml results/out_envmodules_seed_$$seed\_run_$$i/; \
  			done; \
  		done \
