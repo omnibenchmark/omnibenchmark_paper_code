@@ -26,7 +26,7 @@
 # ============================================================
 
 
-MAX_CORES ?= 10
+MAX_CORES ?= 40
 
 # EasyBuild installation prefix (imallona; edit accordingly) ## <------------------------------------!!!!
 EASYBUILD_PREFIX ?= /data/imallona/.local/easybuild
@@ -37,7 +37,7 @@ OB_CMD = ob run --cores ${MAX_CORES} --continue-on-error --task-timeout 10min --
 
 # actual benchmark plan repository - to be pinned (the commit/tag)
 CLUSTERING_REPO   = https://github.com/omnibenchmark/clustering_example
-CLUSTERING_BRANCH = update-to-0.4
+CLUSTERING_BRANCH = update-to-0.4-full
 CLUSTERING_DIR	  = clustering_example
 
 # legacy reports in the wrong repository; to be moved to this one
@@ -46,15 +46,18 @@ REPORTS_BRANCH = 040
 REPORTS_DIR    = clustering_report
 
 ## seeds to explore
-SEEDS := 2 #54# 546 744 1443
+SEEDS := 2 54
 
 ## repeated runs per seed
-RUNS := 1 #2#3
+RUNS := 1 2
 
 all: clone_yamls clone_reports run_conda run_oras run_envs knit_report
 
 clean:
 	/bin/rm -rf results/ clustering_example/ clustering_report/ .omnibenchmark/ .snakemake/
+
+find:
+	find . | grep clustbench.scores.gz | wc -l
 
 # clone the clustering_example repo if not already present
 clone_yamls:
