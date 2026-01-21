@@ -46,10 +46,10 @@ REPORTS_BRANCH = 040
 REPORTS_DIR    = clustering_report
 
 ## seeds to explore
-SEEDS := 2 54
+SEEDS := 2 #54
 
 ## repeated runs per seed
-RUNS := 1 2
+RUNS := 1 #2
 
 all: clone_yamls clone_reports run_conda run_oras run_envs knit_report
 
