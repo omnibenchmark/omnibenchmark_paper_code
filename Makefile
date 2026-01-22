@@ -46,7 +46,7 @@ REPORTS_BRANCH = 040
 REPORTS_DIR    = clustering_report
 
 ## seeds to explore
-SEEDS := 2 #54
+SEEDS := 20 54
 
 ## repeated runs per seed
 RUNS := 1 #2
@@ -84,12 +84,13 @@ run_conda: clone_yamls
 	@for seed in $(SEEDS); do \
 		echo "Running conda benchmark with seed $$seed..."; \
 		cp $(CLUSTERING_DIR)/Clustering_conda.yml $(CLUSTERING_DIR)/Clustering_conda_tmp.yml; \
-		sed -i "s/--seed\",[[:space:]]*[0-9]\+/--seed\", $$seed/" $(CLUSTERING_DIR)/Clustering_conda_tmp.yml; \
+		sed -i "s/seed: 2/seed: $$seed/" $(CLUSTERING_DIR)/Clustering_conda_tmp.yml; \
 		for i in $(RUNS); do \
-			echo "  Run $$i for seed $$seed and run $$i."; \
-                        echo "DEST: results/out_conda_seed_$$seed\_run_$$i" ;\
-			${OB_CMD} $(CLUSTERING_DIR)/Clustering_conda_tmp.yml --out-dir results/out_conda_seed_$$seed\_run_$$i; \
-			cp $(CLUSTERING_DIR)/Clustering_conda_tmp.yml results/out_conda_seed_$$seed\_run_$$i/; \
+			echo " RUN: seed $$seed and run $$i."; \
+                        echo "DEST: results/out_conda-seed_$$seed-run_$$i"; \
+	                mkdir -p "results/out_conda-seed_$$seed-run_$$i"; \
+			cp $(CLUSTERING_DIR)/Clustering_conda_tmp.yml results/out_conda-seed_$$seed-run_$$i/bench.yaml; \
+			${OB_CMD} $(CLUSTERING_DIR)/Clustering_conda_tmp.yml --out-dir results/out_conda-seed_$$seed-run_$$i; \
 		done; \
 	done
 
@@ -97,11 +98,13 @@ run_oras: clone_yamls
 	@for seed in $(SEEDS); do \
 		echo "Running oras benchmark with seed $$seed..."; \
 		cp $(CLUSTERING_DIR)/Clustering_oras.yml $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
-		sed -i "s/--seed\",[[:space:]]*[0-9]\+/--seed\", $$seed/" $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
+		sed -i "s/seed: 2/seed: $$seed/" $(CLUSTERING_DIR)/Clustering_oras_tmp.yml; \
 		for i in $(RUNS); do \
-			echo "  Run $$i for seed $$seed and run $$i."; \
-			${OB_CMD} $(CLUSTERING_DIR)/Clustering_oras_tmp.yml --out-dir results/out_oras_seed_$$seed\_run_$$i/; \
-			cp $(CLUSTERING_DIR)/Clustering_oras_tmp.yml results/out_oras_seed_$$seed\_run_$$i/; \
+			echo " RUN: seed $$seed and run $$i."; \
+                        echo "DEST: results/out_oras-seed_$$seed-run_$$i" ;\
+	                mkdir -p "results/out_oras-seed_$$seed-run_$$i"; \
+			cp $(CLUSTERING_DIR)/Clustering_oras_tmp.yml results/out_oras-seed_$$seed-run_$$i/bench.yaml; \
+			${OB_CMD}  $(CLUSTERING_DIR)/Clustering_oras_tmp.yml --out-dir results/out_oras-seed_$$seed-run_$$i; \
 		done; \
 	done
 
@@ -115,11 +118,13 @@ run_envs: clone_yamls
  		for seed in $(SEEDS); do \
  			echo "Running envmodules benchmark with seed $$seed..."; \
  			cp $(CLUSTERING_DIR)/Clustering_envmodules.yml $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
-			sed -i "s/--seed\",[[:space:]]*[0-9]\+/--seed\", $$seed/" $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
+		        sed -i "s/seed: 2/seed: $$seed/" $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
  			for i in $(RUNS); do \
- 				echo "  Run $$i for seed $$seed and run $$i..."; \
- 				${OB_CMD} $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml --out-dir results/out_envmodules_seed_$$seed\_run_$$i/; \
- 				cp $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml results/out_envmodules_seed_$$seed\_run_$$i/; \
+				echo " RUN: seed $$seed and run $$i..."; \
+                                echo "DEST: results/out_oras-seed_$$seed-run_$$i" ;\
+	                        mkdir -p "results/out_envmodules-seed_$$seed-run_$$i"; \
+ 				cp $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml results/out_envmodules-seed_$$seed-run_$$i/bench.yaml; \
+				${OB_CMD} $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml --out-dir results/out_envmodules-seed_$$seed-run_$$i; \
  			done; \
  		done \
  	'
@@ -127,5 +132,5 @@ run_envs: clone_yamls
 knit_report: clone_reports
 	## R -e 'rmarkdown::render("$(REPORTS_DIR)/07_metrics_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
 	## R -e 'rmarkdown::render("$(REPORTS_DIR)/08_performances_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
-	python parse_results.py > aggregated_results.json
-	R -e 'rmarkdown::render("analyze_results_izaskun.Rmd")'
+	#python parse_results.py > aggregated_results.json
+	#R -e 'rmarkdown::render("analyze_results_mark.Rmd")'
