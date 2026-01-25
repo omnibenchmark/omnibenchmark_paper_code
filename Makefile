@@ -26,10 +26,10 @@
 # ============================================================
 
 
-MAX_CORES ?= 40
+MAX_CORES ?= 30
 
 # EasyBuild installation prefix (imallona; edit accordingly) ## <------------------------------------!!!!
-EASYBUILD_PREFIX ?= /data/imallona/.local/easybuild
+EASYBUILD_PREFIX ?= /data/mark/.local/easybuild
 export EASYBUILD_PREFIX
 
 # omnibenchmark command template
@@ -46,18 +46,19 @@ REPORTS_BRANCH = 040
 REPORTS_DIR    = clustering_report
 
 ## seeds to explore
-SEEDS := 20 54
+SEEDS := 20 54 85
 
 ## repeated runs per seed
-RUNS := 1 #2
+RUNS := 1 2
 
 all: clone_yamls clone_reports run_conda run_oras run_envs knit_report
 
 clean:
-	/bin/rm -rf results/ clustering_example/ clustering_report/ .omnibenchmark/ .snakemake/
+	/bin/rm -rf results/ clustering_example/ clustering_report/ .omnibenchmark/ .snakemake/ snakemake.log
 
 find:
 	find . | grep clustbench.scores.gz | wc -l
+	find . | grep clustbench.data.gz | wc -l
 
 # clone the clustering_example repo if not already present
 clone_yamls:
@@ -110,11 +111,10 @@ run_oras: clone_yamls
 
 run_envs: clone_yamls
 	@bash -c '\
- 		source /cvmfs/software.eessi.io/versions/2025.06/init/lmod/bash && \
- 		module load EESSI-extend/2025.06-easybuild && \
- 		export MODULEPATH="$(EASYBUILD_PREFIX)/software/modules/all:$$MODULEPATH" && \
- 		module use $$MODULEPATH && \
-                 echo $$MODULEPATH && \
+		source /cvmfs/software.eessi.io/versions/2025.06/init/lmod/bash && \
+		export MODULEPATH="/data/mark/.local/easybuild/software/modules/all:$$MODULEPATH" && \
+		module use $$MODULEPATH && \
+		echo $$MODULEPATH && \
  		for seed in $(SEEDS); do \
  			echo "Running envmodules benchmark with seed $$seed..."; \
  			cp $(CLUSTERING_DIR)/Clustering_envmodules.yml $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
@@ -128,6 +128,8 @@ run_envs: clone_yamls
  			done; \
  		done \
  	'
+# module load EESSI-extend/2025.06-easybuild && \
+# module load foss/2024a && \
 
 knit_report: clone_reports
 	## R -e 'rmarkdown::render("$(REPORTS_DIR)/07_metrics_across_backends.Rmd", params = list(performance_bn = "performance-results.rds", metrics_bn = "metrics-results.rds", clustering_dir =  "."))'
