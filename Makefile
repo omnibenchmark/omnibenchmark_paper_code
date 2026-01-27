@@ -29,7 +29,7 @@
 MAX_CORES ?= 30
 
 # EasyBuild installation prefix (imallona; edit accordingly) ## <------------------------------------!!!!
-EASYBUILD_PREFIX ?= /data/mark/.local/easybuild
+EASYBUILD_PREFIX ?= /home/mark/envmodules_debug/.local/easybuild/
 export EASYBUILD_PREFIX
 
 # omnibenchmark command template
@@ -112,9 +112,10 @@ run_oras: clone_yamls
 run_envs: clone_yamls
 	@bash -c '\
 		source /cvmfs/software.eessi.io/versions/2025.06/init/lmod/bash && \
-		export MODULEPATH="/data/mark/.local/easybuild/software/modules/all:$$MODULEPATH" && \
-		module use $$MODULEPATH && \
-		echo $$MODULEPATH && \
+ 		module load EESSI-extend/2025.06-easybuild && \
+ 		export MODULEPATH="$(EASYBUILD_PREFIX)/software/modules/all:$$MODULEPATH" && \
+ 		  module use $$MODULEPATH && \
+                    echo $$MODULEPATH && \
  		for seed in $(SEEDS); do \
  			echo "Running envmodules benchmark with seed $$seed..."; \
  			cp $(CLUSTERING_DIR)/Clustering_envmodules.yml $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
