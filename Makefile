@@ -20,7 +20,7 @@
 #
 # Environment:
 # - MAX_CORES controls num concurrent rules
-# - EASYBUILD_PREFIX needs to be tuned to access the envmodules built extending EESSI <--------------!!!!
+# - EASYBUILD_LOC needs to be tuned to access the envmodules built extending EESSI <--------------!!!!
 #    see: https://github.com/omnibenchmark/clustering_example/pull/43
 #
 # ============================================================
@@ -29,8 +29,8 @@
 MAX_CORES ?= 30
 
 # EasyBuild installation prefix (imallona; edit accordingly) ## <------------------------------------!!!!
-EASYBUILD_PREFIX ?= /home/mark/envmodules_debug/.local/easybuild/
-export EASYBUILD_PREFIX
+EASYBUILD_LOC ?= /home/mark/eessi/versions/2025.06/software/linux/x86_64/amd/zen2/modules/all:/home/mark/envmodules_debug/.local/easybuild/software/modules/all:/cvmfs/software.eessi.io/host_injections/2025.06/software/linux/x86_64/amd/zen2/modules/all:/cvmfs/software.eessi.io/versions/2025.06/software/linux/x86_64/amd/zen2/modules/all:/cvmfs/software.eessi.io/versions/2025.06/init/modules
+export EASYBUILD_LOC
 
 # omnibenchmark command template
 OB_CMD = ob run --cores ${MAX_CORES} --continue-on-error --task-timeout 10min --yes
@@ -113,9 +113,10 @@ run_envs: clone_yamls
 	@bash -c '\
 		source /cvmfs/software.eessi.io/versions/2025.06/init/lmod/bash && \
  		module load EESSI-extend/2025.06-easybuild && \
- 		export MODULEPATH="$(EASYBUILD_PREFIX)/software/modules/all:$$MODULEPATH" && \
+ 		export MODULEPATH="$(EASYBUILD_LOC)" && \
  		  module use $$MODULEPATH && \
                     echo $$MODULEPATH && \
+                ob --version && \
  		for seed in $(SEEDS); do \
  			echo "Running envmodules benchmark with seed $$seed..."; \
  			cp $(CLUSTERING_DIR)/Clustering_envmodules.yml $(CLUSTERING_DIR)/Clustering_envmodules_tmp.yml; \
