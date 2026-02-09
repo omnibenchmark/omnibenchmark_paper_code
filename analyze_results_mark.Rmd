@@ -379,6 +379,28 @@ ggsave("cpu_time-suppfig.pdf", cowplot::plot_grid(p,q), width = 10, height = 5)
 
 ```{r}
 
+common <- list(geom_point(size = 3, alpha = .8),
+               scale_x_log10(),
+               scale_y_log10(),
+               scale_colour_manual(values=my_colors),
+               geom_hline(yintercept = 1, colour="black", linetype="dashed"),
+               xlab("Maximum Resident Set Size (MB): conda"),
+               theme_classic(),
+               theme(legend.spacing.y = unit(.01, 'cm'),
+                     legend.key.spacing.y = unit(.01, 'cm'),
+                     legend.key.height = unit(.1, 'cm'),
+                     axis.text.x = element_text(size = 12),
+                     axis.title.x = element_text(size = 14),
+                     axis.text.y = element_text(size = 12),
+                     axis.title.y = element_text(size = 14),
+                     plot.title = element_text(size = 18)))
+
+p_labeling <- list(ylab("Maximum RSS ratio: Apptainer / conda"),
+                   ggtitle("omni-clustering-benchmarks:\nApptainer vs. conda"))
+
+q_labeling <- list(ylab("Maximum RSS ratio: EasyBuild / conda"),
+                   ggtitle("omni-clustering-benchmarks: \nEasyBuild vs. conda"))
+
 (md.app <- median(df$max_rss.apptainer/df$max_rss))
 
 p <- ggplot(df,
