@@ -221,147 +221,185 @@ lmd <- perf_df %>% filter(backend=="envmodules") %>%
 
 df <- inner_join(lmd, app, by = c("seed", "dataset", "method", "run"),
                  suffix = c(".envmodules",".apptainer")) %>%
-  inner_join(cnd, by = c("seed", "dataset", "method", "run"))
+  inner_join(cnd, by = c("seed", "dataset", "method", "run")) 
 
-eps <- 1
 
-df$module <- sapply(strsplit(df$method, "_", fixed=TRUE), .subset, 1)
+df$module <- factor(sapply(strsplit(df$method, 
+                                    "_", fixed=TRUE), .subset, 1),
+                    levels = rev(c("genieclust","sklearn","fastcluster",
+                               "agglomerative","fcps")))
 df$seed <- as.factor(df$seed)
 df$run <- as.factor(df$run)
 
+# eps <- 1
+# df <- df %>% mutate(A.apptainer = log2(cpu_time.apptainer+cpu_time+eps),
+#                     M.apptainer = log((cpu_time.apptainer+eps)/(cpu_time+eps)),
+#                     A.envmod = log2(cpu_time.envmodules+cpu_time+eps),
+#                     M.envmod = log((cpu_time.envmodules+eps)/(cpu_time+eps)))
+# 
+# 
+# ggplot(df, aes(A.apptainer, M.apptainer, shape=seed)) + 
+#   geom_point()
+# 
+# ggplot(df, aes(A.envmod, M.envmod, shape=seed)) + 
+#   geom_point()
 
-df <- df %>% mutate(A.apptainer = log2(cpu_time.apptainer+cpu_time+eps),
-                    M.apptainer = log((cpu_time.apptainer+eps)/(cpu_time+eps)),
-                    A.envmod = log2(cpu_time.envmodules+cpu_time+eps),
-                    M.envmod = log((cpu_time.envmodules+eps)/(cpu_time+eps)))
-
-
-ggplot(df, aes(A.apptainer, M.apptainer, shape=seed)) + 
-  geom_point()
-
-ggplot(df, aes(A.envmod, M.envmod, shape=seed)) + 
-  geom_point()
-
-df.f <- df %>% filter(cpu_time > 45 | cpu_time.apptainer > 45 |
-                        cpu_time.envmodules > 45) %>%
-  mutate(lct.conda=log(cpu_time),
-         lct.apptainer=log(cpu_time.apptainer),
-         lct.envmodules=log(cpu_time.envmodules))
-
-
-# linear models?
-library(MASS)
-fit <- lm(lct.conda-lct.apptainer ~ 1, data=df.f)
-summary(fit)
-
-fit <- lm(lct.conda ~ 0+lct.envmodules, data=df.f)
-summary(fit)
+# df.f <- df %>% filter(cpu_time > 45 | cpu_time.apptainer > 45 |
+#                         cpu_time.envmodules > 45) %>%
+#   mutate(lct.conda=log(cpu_time),
+#          lct.apptainer=log(cpu_time.apptainer),
+#          lct.envmodules=log(cpu_time.envmodules))
 
 
+# # linear models?
+# library(MASS)
+# fit <- lm(lct.conda-lct.apptainer ~ 1, data=df.f)
+# summary(fit)
+# 
+# fit <- lm(lct.conda ~ 0+lct.envmodules, data=df.f)
+# summary(fit)
+# 
 
-md.app <- median(df$cpu_time.apptainer/df$cpu_time)
 
-p <- ggplot(df, 
+my_colors <- c("fcps" = "grey90", "agglomerative" = "salmon",
+               "fastcluster" = "lightsteelblue", "sklearn" = "orange",
+               "genieclust" = "darkgreen")
+
+common <- list(geom_point(size = 3, alpha = .8),
+               scale_x_log10(),
+               scale_y_log10(),
+               scale_colour_manual(values=my_colors),
+               geom_hline(yintercept = 1, colour="black", linetype="dashed"),
+               xlab("CPU time(s): conda"),
+               theme_classic(),
+               theme(axis.text.x = element_text(size = 12),
+                     axis.title.x = element_text(size = 14),
+                     axis.text.y = element_text(size = 12),
+                     axis.title.y = element_text(size = 14),
+                     plot.title = element_text(size = 18)))
+
+p_labeling <- list(ylab("CPU time ratio: Apptainer / conda"),
+                   ggtitle("omni-clustering-benchmarks:\nApptainer vs. conda"))
+
+q_labeling <- list(ylab("CPU time ratio: EasyBuild / conda"),
+                   ggtitle("omni-clustering-benchmarks: \nEasyBuild vs. conda"))
+
+
+
+df <- df %>% arrange(module)
+
+(md.app <- median(df$cpu_time.apptainer/df$cpu_time))
+
+k <- df$cpu_time > 1 & (df$cpu_time.apptainer/df$cpu_time < 2) & (df$cpu_time.apptainer/df$cpu_time > .5)
+
+
+
+# p <- ggplot(df %>% dplyr::filter(k), 
+#        aes(cpu_time, cpu_time.apptainer/cpu_time,
+#            shape=seed, colour=module)) +
+#   common
+
+(md.app <- median(df$cpu_time.apptainer[k]/df$cpu_time[k]))
+
+p <- ggplot(df %>% dplyr::filter(k), 
        aes(cpu_time, cpu_time.apptainer/cpu_time,
-           shape=seed, colour=module)) + 
-  geom_point(size = 3, alpha = .8) + 
-  scale_x_log10(limits = c(10, 10000)) +
-  scale_y_log10(limits = c(.5, 2)) +
-  geom_hline(yintercept = 1, colour="black", linetype="dashed") +
+           shape=seed, colour=module)) +
+  common +
+  p_labeling +
   geom_hline(yintercept = md.app, colour="blue") +
-  xlab("CPU time(s): conda") +
-  ylab("CPU time ratio: apptainer / conda") +
-  theme_classic() +
-  theme(legend.position="none", 
-        axis.text.x = element_text(size = 12),
-        axis.title.x = element_text(size = 14),
-        axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 14),
-        plot.title = element_text(size = 18)) +
-  ggtitle("omni-clustering-benchmarks:\napptainer vs. conda")
+  scale_y_log10(limits = c(.5, 2)) +
+  scale_x_log10(limits = c(4,10000)) + 
+  theme(legend.position="none")
   
 p <- p +
   annotate(geom = "curve", x = 5000, y = 1.414165, xend = 10000, 
            yend = md.app, curvature = -.2, 
            arrow = arrow(length = unit(2, "mm")),
            colour = "blue") +
-  annotate(geom = "text", x = 5000, y = 1.6, label = paste0("avg. relative\nspeed: ", round(md.app, 2)), 
+  annotate(geom = "text", x = 5000, y = 1.6, 
+           label = paste0("median relative\nspeed: ", round(md.app, 3)), 
            hjust = "center", colour = "blue")
 
 
-md.env <- median(df$cpu_time.envmodules/df$cpu_time)
+# take subset
+k <- df$cpu_time > 1 & (df$cpu_time.envmodules/df$cpu_time < 2) & (df$cpu_time.envmodules/df$cpu_time > .5)
+(md.env <- median(df$cpu_time.envmodules[k]/df$cpu_time[k]))
 
-q <- ggplot(df, 
+q <- ggplot(df %>% dplyr::filter(k), 
        aes(cpu_time, cpu_time.envmodules/cpu_time,
-           shape=seed, colour=module)) + 
-  geom_point(size = 3, alpha = .8) + 
-  # geom_point(data = df %>% dplyr::filter(run=="1"),
-  #            aes(fill=run, colour=module), colour="black", size = 3, alpha = .8) + 
-  scale_x_log10(limits = c(10, 10000), 
-                expand = expansion(mult = c(.05, .05))) +
-  scale_y_log10(limits = c(.5, 2)) +
+           shape=seed, colour=module)) +
+  common +
+  q_labeling +
   geom_hline(yintercept = md.env, colour="blue") +
-  geom_hline(yintercept = 1, colour="black", linetype="dashed") +
-  xlab("CPU time(s): conda") +
-  ylab("CPU time ratio: EasyBuild / conda") +
-  theme_classic() +
-  theme(legend.position=c(.8,.2),
-        legend.spacing.y = unit(.01, 'cm'),
-        legend.key.spacing.y = unit(.01, 'cm'),
-        legend.key.height = unit(.4, 'cm'),
-        axis.text.x = element_text(size = 12),
-        axis.title.x = element_text(size = 14),
-        axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 14),
-        plot.title = element_text(size = 18),
-        legend.text=element_text(size=12)) +
-  ggtitle("omni-clustering-benchmarks: \nEasyBuild vs. conda")
+  scale_y_log10(limits = c(.5, 2)) +
+  scale_x_log10(limits = c(4,10000)) +
+  theme(legend.position=c(.9,.2))
 
 q <- q +
   annotate(geom = "curve", x = 5000, y = 1.414165, xend = 10000, 
            yend = md.env, curvature = -.2, 
            arrow = arrow(length = unit(2, "mm")),
            colour = "blue") +
-  annotate(geom = "text", x = 5000, y = 1.6, label = paste0("avg. relative\nspeed: ", round(md.env, 2)), 
+  annotate(geom = "text", x = 5000, y = 1.6, 
+           label = paste0("median relative\nspeed: ", round(md.env, 3)), 
            hjust = "center", colour = "blue")
 
+# main figure
 cowplot::plot_grid(p,q)
 
-# ggplot(df %>% filter(cpu_time > 45 | cpu_time.envmodules > 45), 
-#        aes(cpu_time, cpu_time.envmodules, shape=seed,
-#            colour = mean_load-mean_load.envmodules)) + 
-#   geom_point() + 
-#   scale_x_log10() +
-#   scale_y_log10() +
-#   geom_abline() #+ facet_wrap(~dataset)
-# 
-# 
-# df %>% filter(cpu_time > 40 & cpu_time.envmodules < 5)
 
 
-# bunch of random plots
 
-# ggplot(df, aes(is.na(max_pss), s)) + geom_boxplot() + geom_jitter() +
-#   scale_y_log10()
-# 
-# ggplot(df, aes(s, cpu_time)) + geom_point() +
-#   scale_y_log10() + scale_x_log10()
-#   
-# 
-# ggplot(df, aes(s, max_rss)) +
-#   geom_point() + scale_x_log10() + scale_y_log10()
-# 
-# ggplot(df, aes(s, io_in)) +
-#   geom_point() + scale_x_log10() + scale_y_log10()
-# 
-# ggplot(df, aes(cpu_time, cpu_time.envmodules)) + 
-#   geom_point() + 
-#   scale_x_log10() +
-#   scale_y_log10() +
-#   geom_abline() +
-#   facet_wrap(~dataset)
+(md.app <- median(df$cpu_time.apptainer/df$cpu_time))
+
+p <- ggplot(df,
+       aes(cpu_time, cpu_time.apptainer/cpu_time,
+           shape=seed, colour=module)) +
+  common +
+  p_labeling +
+  geom_hline(yintercept = md.app, colour="blue")
+
+
+p <- p +
+  annotate(geom = "curve", x = 5000, y = 1.414165, xend = 10000, 
+           yend = md.app, curvature = -.2, 
+           arrow = arrow(length = unit(2, "mm")),
+           colour = "blue") +
+  annotate(geom = "text", x = 5000, y = 1.6, 
+           label = paste0("median relative\nspeed: ", round(md.app, 3)), 
+           hjust = "center", colour = "blue")
+
+
+(md.env <- median(df$cpu_time.envmodules/df$cpu_time))
+
+q <- ggplot(df, 
+       aes(cpu_time, cpu_time.envmodules/cpu_time,
+           shape=seed, colour=module)) +
+  common +
+  q_labeling +
+  geom_hline(yintercept = md.env, colour="blue") +
+  theme(legend.position=c(.9,.2))
+
+q <- q +
+  annotate(geom = "curve", x = 5000, y = 1.414165, xend = 10000, 
+           yend = md.env, curvature = -.2, 
+           arrow = arrow(length = unit(2, "mm")),
+           colour = "blue") +
+  annotate(geom = "text", x = 5000, y = 1.6, 
+           label = paste0("median relative\nspeed: ", round(md.env, 3)), 
+           hjust = "center", colour = "blue")
+
+
+
+
+# supp figure
+cowplot::plot_grid(p,q)
 
 ```
+
+
+## Looking at memory usage
+
 
 
 ## Looking at adjusted rand indices
@@ -397,40 +435,37 @@ df$run <- as.factor(df$run)
 table(abs(df$value-df$value.apptainer))
 table(abs(df$value-df$value.envmodules))
 
+common <- list(geom_point(size = 3, alpha = .8),
+               scale_colour_manual(values=my_colors),
+               geom_hline(yintercept = 1, colour="black", linetype="dashed"),
+               xlab("Adjusted Rand Index: conda"),
+               geom_point(size = 3, alpha = .8),
+               geom_abline(colour="black", linetype="dashed"),
+               theme_classic(),
+               theme(legend.spacing.y = unit(.01, 'cm'),
+                     legend.key.spacing.y = unit(.01, 'cm'),
+                     legend.key.height = unit(.1, 'cm'),
+                     axis.text.x = element_text(size = 12),
+                     axis.title.x = element_text(size = 14),
+                     axis.text.y = element_text(size = 12),
+                     axis.title.y = element_text(size = 14),
+                     plot.title = element_text(size = 18),
+                     legend.text=element_text(size=8)))
+
+
 p <- ggplot(df, aes(value, value.apptainer,
                     shape=seed, colour=module)) + 
-  geom_point(size = 3, alpha = .8) + 
-  geom_abline(colour="black", linetype="dashed") +
-  xlab("Adjusted Rand Index: conda") +
+  common +
   ylab("Adjusted Rand Index: Apptainer") +
-  theme_classic() +
-  theme(legend.position=c(.25,.75), 
-        legend.spacing.y = unit(.01, 'cm'),
-        legend.key.spacing.y = unit(.01, 'cm'),
-        legend.key.height = unit(.4, 'cm'),
-        axis.text.x = element_text(size = 12),
-        axis.title.x = element_text(size = 14),
-        axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 14),
-        plot.title = element_text(size = 18),
-        legend.text=element_text(size=12)) +
+  theme(legend.position=c(.25,.75)) +
   ggtitle("omni-clustering-benchmarks:\nApptainer vs. conda")
 
 q <- ggplot(df, aes(value, value.envmodules,
                     shape=seed, colour=module)) + 
-  geom_point(size = 3, alpha = .8) + 
-  geom_abline(colour="black", linetype="dashed") +
-  xlab("Adjusted Rand Index: conda") +
+  common +
   ylab("Adjusted Rand Index: EasyBuild") +
-  theme_classic() +
-  theme(legend.position="none", 
-        axis.text.x = element_text(size = 12),
-        axis.title.x = element_text(size = 14),
-        axis.text.y = element_text(size = 12),
-        axis.title.y = element_text(size = 14),
-        plot.title = element_text(size = 18)) +
+  theme(legend.position="none") +
   ggtitle("omni-clustering-benchmarks:\nEasyBuild vs. conda")
-
 
 q <- q +
   annotate(geom = "curve", x = .75, y = .5, xend = .29, 
@@ -468,7 +503,6 @@ df <- inner_join(lmd %>% dplyr::filter(run == "1"),
                 seed.apptainer != seed)
 
 df %>% filter(abs(value-value.envmodules)>0.0000001)
-
 
 
 ```
