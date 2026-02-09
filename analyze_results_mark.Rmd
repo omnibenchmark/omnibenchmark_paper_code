@@ -26,6 +26,8 @@ library(ggplot2)
 library(stringr)
 library(readr)
 library(cowplot)
+library(rjson)
+
 
 knitr::opts_chunk$set(
   echo    = TRUE,
@@ -231,35 +233,6 @@ df$module <- factor(sapply(strsplit(df$method,
 df$seed <- as.factor(df$seed)
 df$run <- as.factor(df$run)
 
-# eps <- 1
-# df <- df %>% mutate(A.apptainer = log2(cpu_time.apptainer+cpu_time+eps),
-#                     M.apptainer = log((cpu_time.apptainer+eps)/(cpu_time+eps)),
-#                     A.envmod = log2(cpu_time.envmodules+cpu_time+eps),
-#                     M.envmod = log((cpu_time.envmodules+eps)/(cpu_time+eps)))
-# 
-# 
-# ggplot(df, aes(A.apptainer, M.apptainer, shape=seed)) + 
-#   geom_point()
-# 
-# ggplot(df, aes(A.envmod, M.envmod, shape=seed)) + 
-#   geom_point()
-
-# df.f <- df %>% filter(cpu_time > 45 | cpu_time.apptainer > 45 |
-#                         cpu_time.envmodules > 45) %>%
-#   mutate(lct.conda=log(cpu_time),
-#          lct.apptainer=log(cpu_time.apptainer),
-#          lct.envmodules=log(cpu_time.envmodules))
-
-
-# # linear models?
-# library(MASS)
-# fit <- lm(lct.conda-lct.apptainer ~ 1, data=df.f)
-# summary(fit)
-# 
-# fit <- lm(lct.conda ~ 0+lct.envmodules, data=df.f)
-# summary(fit)
-# 
-
 
 my_colors <- c("fcps" = "grey90", "agglomerative" = "salmon",
                "fastcluster" = "lightsteelblue", "sklearn" = "orange",
@@ -272,7 +245,10 @@ common <- list(geom_point(size = 3, alpha = .8),
                geom_hline(yintercept = 1, colour="black", linetype="dashed"),
                xlab("CPU time(s): conda"),
                theme_classic(),
-               theme(axis.text.x = element_text(size = 12),
+               theme(legend.spacing.y = unit(.01, 'cm'),
+                     legend.key.spacing.y = unit(.01, 'cm'),
+                     legend.key.height = unit(.1, 'cm'),
+                     axis.text.x = element_text(size = 12),
                      axis.title.x = element_text(size = 14),
                      axis.text.y = element_text(size = 12),
                      axis.title.y = element_text(size = 14),
@@ -333,7 +309,7 @@ q <- ggplot(df %>% dplyr::filter(k),
   geom_hline(yintercept = md.env, colour="blue") +
   scale_y_log10(limits = c(.5, 2)) +
   scale_x_log10(limits = c(4,10000)) +
-  theme(legend.position=c(.9,.2))
+  theme(legend.position=c(.85,.22))
 
 q <- q +
   annotate(geom = "curve", x = 5000, y = 1.414165, xend = 10000, 
@@ -345,7 +321,7 @@ q <- q +
            hjust = "center", colour = "blue")
 
 # main figure
-cowplot::plot_grid(p,q)
+ggsave("cpu_time-mainfig.pdf", cowplot::plot_grid(p,q), width = 10, height = 5)
 
 
 
@@ -357,7 +333,8 @@ p <- ggplot(df,
            shape=seed, colour=module)) +
   common +
   p_labeling +
-  geom_hline(yintercept = md.app, colour="blue")
+  geom_hline(yintercept = md.app, colour="blue") +
+  theme(legend.position = "none")
 
 
 p <- p +
@@ -365,7 +342,7 @@ p <- p +
            yend = md.app, curvature = -.2, 
            arrow = arrow(length = unit(2, "mm")),
            colour = "blue") +
-  annotate(geom = "text", x = 5000, y = 1.6, 
+  annotate(geom = "text", x = 5000, y = 3, 
            label = paste0("median relative\nspeed: ", round(md.app, 3)), 
            hjust = "center", colour = "blue")
 
@@ -378,14 +355,14 @@ q <- ggplot(df,
   common +
   q_labeling +
   geom_hline(yintercept = md.env, colour="blue") +
-  theme(legend.position=c(.9,.2))
+  theme(legend.position=c(.85,.22))
 
 q <- q +
   annotate(geom = "curve", x = 5000, y = 1.414165, xend = 10000, 
            yend = md.env, curvature = -.2, 
            arrow = arrow(length = unit(2, "mm")),
            colour = "blue") +
-  annotate(geom = "text", x = 5000, y = 1.6, 
+  annotate(geom = "text", x = 5000, y = 3, 
            label = paste0("median relative\nspeed: ", round(md.env, 3)), 
            hjust = "center", colour = "blue")
 
@@ -393,14 +370,61 @@ q <- q +
 
 
 # supp figure
-cowplot::plot_grid(p,q)
+ggsave("cpu_time-suppfig.pdf", cowplot::plot_grid(p,q), width = 10, height = 5)
 
 ```
 
 
 ## Looking at memory usage
 
+```{r}
 
+(md.app <- median(df$max_rss.apptainer/df$max_rss))
+
+p <- ggplot(df,
+       aes(max_rss, max_rss.apptainer/max_rss,
+           shape=seed, colour=module)) +
+  common +
+  p_labeling +
+  geom_hline(yintercept = md.app, colour="blue") +
+  theme(legend.position = "none")
+
+
+p <- p +
+  annotate(geom = "curve", x = 5000, y = 2, xend = 10000, 
+           yend = md.app, curvature = -.2, 
+           arrow = arrow(length = unit(2, "mm")),
+           colour = "blue") +
+  annotate(geom = "text", x = 5000, y = 3, 
+           label = paste0("median relative\nmax. memory: ", round(md.app, 3)), 
+           hjust = "center", colour = "blue")
+
+
+(md.env <- median(df$max_rss.envmodules/df$max_rss))
+
+q <- ggplot(df, 
+       aes(max_rss, max_rss.envmodules/max_rss,
+           shape=seed, colour=module)) +
+  common +
+  q_labeling +
+  geom_hline(yintercept = md.env, colour="blue") +
+  theme(legend.position=c(.8,.3))
+
+q <- q +
+  annotate(geom = "curve", x = 5000, y = 2, xend = 10000, 
+           yend = md.env, curvature = -.2, 
+           arrow = arrow(length = unit(2, "mm")),
+           colour = "blue") +
+  annotate(geom = "text", x = 5000, y = 3, 
+           label = paste0("median relative\nmax. memory: ", round(md.env, 3)), 
+           hjust = "center", colour = "blue")
+
+
+# supp figure
+ggsave("max_rss-suppfig.pdf", cowplot::plot_grid(p,q), width = 10, height = 5)
+
+
+```
 
 ## Looking at adjusted rand indices
 
@@ -437,7 +461,6 @@ table(abs(df$value-df$value.envmodules))
 
 common <- list(geom_point(size = 3, alpha = .8),
                scale_colour_manual(values=my_colors),
-               geom_hline(yintercept = 1, colour="black", linetype="dashed"),
                xlab("Adjusted Rand Index: conda"),
                geom_point(size = 3, alpha = .8),
                geom_abline(colour="black", linetype="dashed"),
@@ -468,14 +491,14 @@ q <- ggplot(df, aes(value, value.envmodules,
   ggtitle("omni-clustering-benchmarks:\nEasyBuild vs. conda")
 
 q <- q +
-  annotate(geom = "curve", x = .75, y = .5, xend = .29, 
+  annotate(geom = "curve", x = .65, y = .3, xend = .29, 
            yend = .1443, curvature = -.2, 
            arrow = arrow(length = unit(2, "mm")),
            colour = "blue") +
-  annotate(geom = "text", x = .75, y = .54, label = "Ward (wut/z1)", 
+  annotate(geom = "text", x = .65, y = .34, label = "Ward (wut/z1)", 
            hjust = "center", colour = "blue")
 
-cowplot::plot_grid(p,q)
+ggsave("aris-mainfig.pdf", cowplot::plot_grid(p,q), width = 10, height = 5)
 
   
 # ggplot(df, aes(value, value.envmodules)) + 
@@ -507,5 +530,116 @@ df %>% filter(abs(value-value.envmodules)>0.0000001)
 
 ```
 
+
+## Aidan's running of Open Problems - figures
+
+```{r}
+
+ddir <- "sharing"
+list.files(ddir)
+
+ob <- read_csv(file.path(ddir, "aggregated_scores.csv"))
+
+rl <- readLines(file.path(ddir, "op_svg_results.json"))
+js <- fromJSON(paste(rl, collapse = ""))
+# op <- lapply(js, function(u) data.frame(dataset_id = u$dataset_id,
+#                                         method_id = u$method_id,))
+
+op <- data.frame(dataset_id = sapply(js, .subset2, "dataset_id"),
+                 method_id = sapply(js, .subset2, "method_id"),
+                 metric_id = "correlation",
+                 op_metric_value = sapply(js, function(u) u$metric_values$correlation),
+                 op_mean_score = sapply(js, .subset2, "mean_score"))
+
+lookup <- rbind( c('tenx_visium/visium', 'spatial_10x_visium'),
+                 c('tenx_visium/post_xenium', 'spatial_10x_xenium'),
+                 c('zenodo_spatial/dbitseq', 'spatial_dbit_seq'),
+                 c('zenodo_spatial/merfish', 'spatial_merfish'),
+                 c('zenodo_spatial/seqfish', 'spatial_seqfish'),
+                 c('zenodo_spatial/slideseqv2', 'spatial_slideseq_v2'),
+                 c('zenodo_spatial_slidetags/slidetags', 'spatial_slide_tags'),
+                 c('zenodo_spatial/starmap', 'spatial_star_map'),
+                 c('zenodo_spatial/stereoseq', 'spatial_stereo_seq'),
+                 c('zenodo_spatial/visium', 'spatial_10x_visium'),
+                 c("tenx_visium/visium/mouse_brain_coronal",
+                   "tenx_visium/visium/mouse_brain_coronal_section1"),
+                 # c("zenodo_spatial/seqfish/mouse_organogenesis_seqfish",
+                 #   "zenodo_spatial/seqfish/mouse_organogenesis"),
+                 c("zenodo_spatial/visium/human_heart_myocardial_infarction_1",
+                   "tenx_visium/visium/human_heart_myocardial_infarction_1"),
+                 c("zenodo_spatial/visium/human_heart_myocardial_infarction_2",
+                   "tenx_visium/visium/human_heart_myocardial_infarction_2"))
+
+
+ob[grep("human_colon_cancer", ob$dataset_id),]
+op[grep("human_colon_cancer", op$dataset_id),]
+
+for(i in 1:nrow(lookup)) {
+  ob$dataset_id <- gsub(lookup[i,2], lookup[i,1], ob$dataset_id)
+}
+
+sum(ob$dataset_id %in% op$dataset_id)
+
+setdiff(ob$dataset_id, op$dataset_id)
+setdiff(op$dataset_id, ob$dataset_id)
+
+m <- full_join(ob, op)
+m$op_metric_value <- as.numeric(m$op_metric_value)
+
+m %>% group_by(method_id) %>% 
+  summarise(diff=mean(abs(metric_value-op_metric_value), na.rm=TRUE),
+            op_nonNA = mean(!is.na(metric_value))) %>%
+  arrange(desc(diff))
+
+ggplot(na.omit(m) %>% filter(method_id != "true_ranking"), 
+       aes(metric_value, op_metric_value)) + 
+  geom_point(size=2) + 
+  geom_abline(colour="blue") +
+  facet_wrap(~method_id, scales = "free") +
+  xlab("ob") + ylab("op")
+
+
+m$method <- "other"
+m$method[m$method_id=="spagcn"] <- "SpaGCN"
+m$method[m$method_id=="spatialde2"] <- "spatialde2"
+
+
+ggplot(na.omit(m) %>% filter(method_id != "true_ranking") %>% arrange(desc(method)), 
+       aes(metric_value, op_metric_value, colour=method)) + 
+  geom_point(size=3, alpha = .8) + 
+  scale_colour_manual(values=c("grey","blue","orange")) +
+  geom_abline(colour="black", linetype="dashed") +
+  xlab("Kendalls tau: Omnibenchmark") + ylab("Kendall's tau: OpenProblems") +
+  theme_classic() +
+  theme(legend.position=c(.25,.75), 
+        legend.spacing.y = unit(.01, 'cm'),
+        legend.key.spacing.y = unit(.01, 'cm'),
+        legend.key.height = unit(.4, 'cm'),
+        axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 14),
+        plot.title = element_text(size = 18),
+        legend.text=element_text(size=12)) +
+  ggtitle("omni-OpenProblems-svg")
+
+
+ggsave("ob-op.pdf", width = 5, height = 5)
+
+
+m %>% group_by(method_id) %>%
+  summarise(diff=mean(abs(metric_value-op_metric_value), na.rm=TRUE),
+            op_nonNA = mean(!is.na(metric_value))) %>%
+  arrange(desc(diff))
+
+# ggplot(na.omit(m) %>% 
+#          filter(method_id != "true_ranking") %>% arrange(method),
+#        aes(metric_value, op_metric_value)) +
+#   geom_point(size=2) +
+#   geom_abline(colour="blue") +
+#   facet_wrap(~method_id, scales = "free") +
+#   theme_classic() +
+#   xlab("ob") + ylab("op")
+```
 
 
