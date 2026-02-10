@@ -92,6 +92,23 @@ extractor <- function(u) {
 }
 
 
+extractor2 <- function(u) {
+  if(nrow(u)) {
+    cn <- colnames(u)
+    ks <- sapply(strsplit(cn, ".", fixed = TRUE), .subset, 1) %>%
+      str_replace("k=","") %>% as.integer
+    vs <- as.numeric(u[1,])-as.numeric(u[1,3])
+    return(data.frame(v1 = vs[1], v2 = vs[2],
+                      v3 = vs[3], v4 = vs[4],
+                      v5 = vs[5], true_k=ks[3]) )
+  } else
+    return( data.frame(v1 = NA, v2 = NA, v3 = NA,
+                       v4 = NA, v5 = NA, true_k=NA) )
+}
+
+
+
+
 ```
 
 ## Computational performance
@@ -185,7 +202,63 @@ scores_df <- scores_df %>% filter(!is.na(value))
 #         conda envmodules  oras
 #   FALSE 28821      28839 28851
 #   TRUE    195        177   162
-  
+
+# extract ARI across values of k
+k <- score_type$metric == "metric-adjusted_rand_score" &
+  score_type$seed == "20" & score_type$run == "1" & 
+  score_type$backend == "conda"
+
+extracted2 <- lapply(rawscores[k], extractor2)
+
+scores_df2 <- data.frame(score_type[k,], 
+                         extracted2 %>% bind_rows()) %>%
+  select(dataset, method, true_k, v1, v2, v3, v4, v5, true_k)
+
+# boxplot(as.data.frame(scores_df2[,c("v1","v2","v3",
+#                                     "v4","v5")]),
+#         ylab="delta ARI")
+
+scores_melt <- melt(scores_df2, 
+                    id.vars = c("dataset","method","true_k"))
+
+levels(scores_melt$variable) <- c("-2","-1","0","+1","+2")
+
+levels(scores_melt$variable) <- c("-2","-1","0","+1","+2")
+
+scores_melt$module <- factor(sapply(strsplit(scores_melt$method, 
+                                    "_", fixed=TRUE), .subset, 1),
+                    levels = rev(c("genieclust","sklearn","fastcluster",
+                               "agglomerative","fcps")))
+
+p <- ggplot(scores_melt %>% dplyr::filter(!is.na(true_k),
+                                     !(true_k==2 & variable %in% c("-2","-1")),
+                                     !(true_k==3 & variable %in% c("-2"))), 
+       aes(variable, value)) + 
+  geom_boxplot(aes(fill = module, colour = module)) +
+  geom_boxplot(aes(fill = module), colour = "grey50", outlier.shape = NA) +
+  scale_fill_manual(values=my_colors) +
+  scale_colour_manual(values=my_colors) +
+  facet_wrap(~true_k) +
+  ylim(-.5, .5) + 
+  ylab("ARI - ARI(true k)") +
+  geom_hline(yintercept = 0, colour="black", linetype="dashed") +
+  xlab("Cluster Number Misspecification") +
+  theme_classic() +
+  theme(legend.position = "top",
+        legend.spacing.y = unit(.01, 'cm'),
+        legend.key.spacing.y = unit(.01, 'cm'),
+        legend.key.height = unit(.1, 'cm'),
+        axis.text.x = element_text(size = 12),
+        axis.title.x = element_text(size = 14),
+        axis.text.y = element_text(size = 12),
+        axis.title.y = element_text(size = 14),
+        plot.title = element_text(size = 18))
+p
+
+ggsave("cluster-misspec-suppfig.pdf", p, width = 10, height = 7)
+
+
+
 ```
 
 
@@ -322,7 +395,6 @@ q <- q +
 
 # main figure
 ggsave("cpu_time-mainfig.pdf", cowplot::plot_grid(p,q), width = 10, height = 5)
-
 
 
 
