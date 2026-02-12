@@ -230,15 +230,18 @@ scores_melt$module <- factor(sapply(strsplit(scores_melt$method,
                     levels = rev(c("genieclust","sklearn","fastcluster",
                                "agglomerative","fcps")))
 
+scores_melt$method_small <- sapply(strsplit(scores_melt$method, "-", fixed = TRUE), .subset, 2)
+
 p <- ggplot(scores_melt %>% dplyr::filter(!is.na(true_k),
                                      !(true_k==2 & variable %in% c("-2","-1")),
-                                     !(true_k==3 & variable %in% c("-2"))), 
+                                     !(true_k==3 & variable %in% c("-2")),
+                                     variable != "0"), 
        aes(variable, value)) + 
-  geom_boxplot(aes(fill = module, colour = module)) +
-  geom_boxplot(aes(fill = module), colour = "grey50", outlier.shape = NA) +
-  scale_fill_manual(values=my_colors) +
-  scale_colour_manual(values=my_colors) +
-  facet_wrap(~true_k) +
+  geom_boxplot(aes(fill = method, colour = method)) +
+  # geom_boxplot(aes(fill = method), colour = "grey50", outlier.shape = NA) +
+  # scale_fill_manual(values=my_colors) +
+  # scale_colour_manual(values=my_colors) +
+  facet_wrap(~dataset, ncol=6) +
   ylim(-.5, .5) + 
   ylab("ARI - ARI(true k)") +
   geom_hline(yintercept = 0, colour="black", linetype="dashed") +
@@ -247,15 +250,17 @@ p <- ggplot(scores_melt %>% dplyr::filter(!is.na(true_k),
   theme(legend.position = "top",
         legend.spacing.y = unit(.01, 'cm'),
         legend.key.spacing.y = unit(.01, 'cm'),
+        legend.text=element_text(size=6),
         legend.key.height = unit(.1, 'cm'),
         axis.text.x = element_text(size = 12),
         axis.title.x = element_text(size = 14),
         axis.text.y = element_text(size = 12),
         axis.title.y = element_text(size = 14),
         plot.title = element_text(size = 18))
+
 p
 
-ggsave("cluster-misspec-suppfig.pdf", p, width = 10, height = 7)
+ggsave("cluster-misspec-suppfig1.pdf", p, width = 10, height = 12)
 
 
 
